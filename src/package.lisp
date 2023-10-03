@@ -1,0 +1,2 @@
+(defpackage gficl
+  (:use :cl))
