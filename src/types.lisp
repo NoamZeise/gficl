@@ -16,3 +16,5 @@
 
 (defmacro pass-colour (fn colour)
   `(,fn (r ,colour) (g ,colour) (b ,colour) (a ,colour)))
+
+(defparameter *colour-blank* (make-colour 0 0 0 0))
