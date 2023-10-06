@@ -2,12 +2,13 @@
 
 (defsystem :gficl
   :long-name "game-framework-in-common-lisp"
-  :depends-on (:cl-glfw3
-	       :cl-opengl
-	       :trivial-main-thread)
+  :depends-on (:uiop
+	       :cl-glfw3
+	       :cl-opengl)
   :components ((:module "src"
                 :components 
                 ((:file "package")
-		 (:file "game" :depends-on ("callbacks" "types"))
+		 (:file "game" :depends-on ("callbacks" "types" "shader"))
 		 (:file "callbacks")
-		 (:file "types")))))
+		 (:file "types")
+		 (:file "shader")))))

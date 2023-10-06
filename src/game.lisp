@@ -3,6 +3,9 @@
 (defun game-closed-p ()
   (glfw:window-should-close-p))
 
+(defun set-game-should-close ()
+  (glfw:set-window-should-close))
+
 (defmacro with-update (&body body)
   `(progn
      (glfw:poll-events)
@@ -14,7 +17,14 @@
      ,@body
      (glfw:swap-buffers)))
 
-(deftype cursor-state () '(member :normal :hidden :disabled))
+
+(defmacro macro-check-type (arg type env)
+  `(if (constantp ,arg ,env)
+       (check-type ,arg ,type)
+       (if (symbolp ,arg)
+	   `(check-type ,,arg ,',type)
+	   `(let ((val ,,arg))
+	      (check-type val ,',type)))))
 
 (defmacro with-game
     ((&key
@@ -23,22 +33,20 @@
 	(height 300)
 	(visible t)
 	(clear-colour '(make-colour 0 0 0 0))
-	(cursor :normal)) ;; normal, hidden, disabled
-     &body body)
-    (declare (type cursor-state cursor)
-	     (type string title))
-  (if (not (eql (type-of (eval clear-colour)) 'colour))
-      (error "The value of clear-colour was not of type COLOUR!"))
-  (setf width  (max 1 (abs (round width))))
-  (setf height (max 1 (abs (round height))))
-  `(trivial-main-thread:with-body-in-main-thread ()
+	(cursor :normal)
+	(vsync t)) ;; normal, hidden, disabled
+     &body body &environment env)
+  `(progn
+     ,(macro-check-type title string env)
+     ,(macro-check-type width integer env)
+     ,(macro-check-type height integer env)
+     ,(macro-check-type clear-colour colour env)
+     ,(macro-check-type cursor cursor-state env)
      ;; keys found in glfw:create-window
      (glfw:with-init-window (:title ,title :width ,width :height ,height :visible ,visible)
-       ;; set opengl pointer to lib loaded by glfw
-       (setf %gl:*gl-get-proc-address* #'glfw:get-proc-address) 
-       (glfw:set-key-callback 'quit-with-esc)
-       (glfw:set-window-size-callback 'resize-callback)
+       (register-glfw-callbacks)
        (glfw:set-input-mode :cursor ,cursor)
        (pass-colour gl:clear-color ,clear-colour)
+       (glfw:swap-interval (if ,vsync 1 0))
        (set-gl-viewport ,width ,height)
        ,@body)))
