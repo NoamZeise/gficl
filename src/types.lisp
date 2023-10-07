@@ -2,8 +2,6 @@
 
 (deftype cursor-state () '(member :normal :hidden :disabled))
 
-(deftype shader-type () '(member :vertex-shader :fragment-shader))
-
 (defclass colour ()
   ((r :initform 0 :accessor r)
    (g :initform 0 :accessor g)

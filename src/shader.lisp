@@ -1,13 +1,14 @@
 (in-package :gficl)
 
-(defclass shader ()
-  ((shader-program :initarg :program :initform 0 :accessor shader-program :type integer)))
+(defclass shader (gl-object)
+  ())
 
 (declaim (ftype (function (pathname pathname) shader) make-shader))
 (defun make-shader (vertex-path fragment-path)
   (let ((vert (compile-shader vertex-path :vertex-shader))
 	(frag (compile-shader fragment-path :fragment-shader))
 	(program (gl:create-program)))
+    ;; link shader
     (gl:attach-shader program vert)
     (gl:attach-shader program frag)
     (gl:link-program program)
@@ -19,7 +20,12 @@
     (gl:detach-shader program frag)
     (gl:delete-shader vert)
     (gl:delete-shader frag)
-    (let ((shader (make-instance 'shader :program program))) shader)))
+    (let ((shader (make-instance 'shader :id program))) shader)))
+
+(defmethod delete-gl ((obj shader))
+  (gl:delete-program (id obj)))
+
+;; helpers
 
 (declaim (ftype (function (pathname shader-type) integer) compile-shader))
 (defun compile-shader (path shader-type)
@@ -31,10 +37,6 @@
       (if (not (eql (length compile-log) 0))
 	  (error 'shader-compile-error :compile-log compile-log :filename path)))
     shader))
-
-(declaim (ftype (function (shader)) delete-shader))
-(defun delete-shader (shader)
-  (gl:delete-program (shader-program shader)))
 
 (define-condition shader-compile-error (error)
   ((compile-log :initarg :compile-log :reader compile-log)
