@@ -9,10 +9,8 @@
   :components ((:module "src"
                 :components 
                 ((:file "package")
-		 (:file "game" :depends-on ("callbacks" "types" "shader"))
-		 (:file "callbacks")
+		 (:file "game" :depends-on ("types" "shader"))
 		 (:file "types")
-		 (:file "shader" :depends-on ("gl-types"))
-		 (:file "framebuffer" :depends-on ("gl-types"))
-		 (:file "texture" :depends-on ("gl-types"))
-		 (:file "gl-types")))))
+		 (:file "shader" :depends-on ("types"))
+		 (:file "framebuffer" :depends-on ("types" "texture"))
+		 (:file "texture" :depends-on ("types"))))))

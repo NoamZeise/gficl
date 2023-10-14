@@ -13,7 +13,7 @@
       (gl:vertex 0.25 0.75 0))))
 
 (with-game (:title "Test")
-  (delete-gl (make-shader #p"shaders/vert.vs" #p"shaders/frag.fs"))
+  (delete-gl (make-shader #p"../shaders/vert.vs" #p"../shaders/frag.fs"))
   (delete-gl (make-texture :rgba 100 100))
   (loop until (gficl::game-closed-p)
 	do (test-render)

@@ -2,7 +2,7 @@
 
 (defclass texture (gl-object) ())
 
-(deftype texture-format () '(member :red :rg :rgb :rgba))
+(deftype image-format () '(member :red :rg :rgb :rgba :depth24-stencil8))
 (deftype texture-wrap ()
   '(member :clamp-to-edge :clamp-to-border :mirrored-repeat :repeat :mirrored-clamp-to-edge))
 (deftype texture-filter () '(member :nearest :linear))
@@ -10,7 +10,7 @@
 (defun make-texture (format width height
 		     &key (samples 1) (data (cffi:null-pointer)) (mipmapping nil)
 		       (wrap :repeat) (filter :nearest))
-  (declare (texture-format format) (integer width) (integer height) (integer samples)
+  (declare (image-format format) (integer width) (integer height) (integer samples)
 	   (texture-wrap wrap) (texture-filter filter))
   "Make a texture, will be a multisample image if samples > 1.
 Data is a pointer to unsigned bytes or unsigned byte array."
