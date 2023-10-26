@@ -27,7 +27,7 @@
   ((id :initarg :id :initform 0 :accessor id :type integer)))
 
 (defgeneric delete-gl (obj)
-  (:documentation "delete a gl-object"))
+  (:documentation "delete an OpenGL object"))
 
 (defmethod delete-gl ((obj gl-object))
   (error "This object has not implemented the delete method"))

@@ -14,14 +14,14 @@
 		(let ((res (make-attachment pos type width height samples)))
 		  (ecase type
 		    (:texture
-		     (progn (gl:framebuffer-texture-2d :framebuffer pos
-						       (tex-type (resource res))
-						       (id (resource res)) 0)
-			    ;; texture attachments will 
-			    (nconc draw-buffers (cons pos nil))))
+		     (progn
+		       (gl:framebuffer-texture-2d :framebuffer pos
+						  (tex-type (resource res))
+						  (id (resource res)) 0)
+		       (nconc draw-buffers (cons pos nil))))
 		    (:renderbuffer
 		     (gl:framebuffer-renderbuffer :framebuffer pos :renderbuffer
-						  (id (resource  res)))))
+						  (id (resource res)))))
 		  res)))
     (if draw-buffers (gl:draw-buffers draw-buffers))
     (let ((status (gl:check-framebuffer-status :framebuffer)))
@@ -34,7 +34,15 @@
   (loop for a in (attachments obj) do (delete-gl a))
   (gl:delete-framebuffers (list (id obj))))
 
-(defun framebuffer-attach-id (framebuffer index))
+(defun framebuffer-attach-id (framebuffer index)
+  (let ((attach (attachments framebuffer)))
+    (dotimes (i index)
+      (if (or (equalp attach nil) (equalp (cdr attach) nil))
+	  (error "Framebuffer attachment index was greater than the number of attachments"))
+      (setf attach (cdr attach)))
+    (if (equalp (res-type (car attach)) :texture)
+	(id (resource (car attach)))
+ 	(error "Tried to get the attachment id of a non texture attachment"))))
 
 (deftype attachment-position ()
   '(member  :color-attachment0 :depth-stencil-attachment))

@@ -17,10 +17,12 @@
   (delete-gl (make-shader #p"shaders/vert.vs" #p"shaders/frag.fs"))
   (delete-gl (make-texture :rgba 100 100))
   (delete-gl (make-renderbuffer :rgb 100 100 1))
-  (delete-gl (create-framebuffer
-	      '((:color-attachment0 :texture)
-		(:depth-stencil-attachment :renderbuffer))
-	      100 100 1))
+  (let ((fb (create-framebuffer
+	     '((:color-attachment0 :texture)
+	       (:depth-stencil-attachment :renderbuffer))
+	     100 100 1)))
+    (gl:bind-framebuffer :draw-framebuffer (framebuffer-attach-id fb 0))
+    (gl:bind-framebuffer :draw-framebuffer 0))
   (loop until (gficl::game-closed-p)
 	do (test-render)
 	do (test-update))
