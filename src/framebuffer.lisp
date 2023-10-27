@@ -4,6 +4,7 @@
   ((attachments :initarg :attachments :accessor attachments)))
 
 (defun create-framebuffer (attachments width height samples)
+  (declare (integer width) (integer height) (integer samples))
   (let ((id (gl:gen-framebuffer))
 	(internal-attachments ())
 	(draw-buffers ()))
@@ -34,6 +35,7 @@
   (loop for a in (attachments obj) do (delete-gl a))
   (gl:delete-framebuffers (list (id obj))))
 
+(declaim (ftype (function (framebuffer integer) integer) framebuffer-attach-id))
 (defun framebuffer-attach-id (framebuffer index)
   (let ((attach (attachments framebuffer)))
     (dotimes (i index)
@@ -54,9 +56,10 @@
    (res-type :initarg :res-type :accessor res-type :type attachment-resource)
    (resource :initarg :res :accessor resource)))
 
+(declaim (ftype (function (attachment-position attachment-resource integer integer integer)
+			  attachment)
+		make-attachment))
 (defun make-attachment (position resource-type width height samples)
-  (declare (attachment-position position) (attachment-resource resource-type)
-	   (integer width) (integer height) (integer samples))
   "Create attachment resource. Either a texture or a renderbuffer."
   (assert (and (> width 0) (> height 0) (> samples 0)))
   (let* ((format (ecase position

@@ -47,8 +47,8 @@ Data is a pointer to unsigned bytes or unsigned byte array."
 
 (defclass renderbuffer (gl-object) ())
 
+(declaim (ftype (function (image-format integer integer integer) renderbuffer) make-renderbuffer))
 (defun make-renderbuffer (format width height samples)
-  (declare (image-format format) (integer width) (integer height) (integer samples))
   "Make a renderbuffer, multisampled if samples > 1"
   (assert (and (> width 0) (> height 0) (> samples 0)))
   (let ((id (gl:gen-renderbuffer)))

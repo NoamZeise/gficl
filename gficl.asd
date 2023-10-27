@@ -13,4 +13,5 @@
 		 (:file "types")
 		 (:file "shader" :depends-on ("types"))
 		 (:file "framebuffer" :depends-on ("types" "image"))
-		 (:file "image" :depends-on ("types"))))))
+		 (:file "image" :depends-on ("types"))
+		 (:file "vertex" :depends-on ("types"))))))
