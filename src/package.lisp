@@ -7,6 +7,7 @@
    #:with-render
 
    #:set-game-should-close
+   #:game-closed-p
    
    #:colour
    #:make-colour))

@@ -15,9 +15,15 @@
   '(member :clamp-to-edge :clamp-to-border :mirrored-repeat :repeat :mirrored-clamp-to-edge))
 (deftype texture-filter () '(member :nearest :linear))
 
-(defun make-texture (format width height
-		     &key (samples 1) (data (cffi:null-pointer)) (mipmapping nil)
-		       (wrap :repeat) (filter :nearest))
+(defun make-texture (format
+		     width
+		     height
+		     &key
+		     (samples 1)
+		     (data (cffi:null-pointer))
+		     (mipmapping nil)
+		     (wrap :repeat)
+		     (filter :nearest))
   (declare (image-format format) (integer width) (integer height) (integer samples)
 	   (texture-wrap wrap) (texture-filter filter))
   "Make a texture, will be a multisample image if samples > 1.
