@@ -3,10 +3,16 @@
 (defclass shader (gl-object)
   ())
 
-(declaim (ftype (function (pathname pathname) shader) make-shader))
-(defun make-shader (vertex-path fragment-path)
-  (let ((vert (compile-shader vertex-path :vertex-shader))
-	(frag (compile-shader fragment-path :fragment-shader))
+(declaim (ftype (function (pathname pathname) shader) make-shader-from-path))
+(defun make-shader-from-path (vertex-path fragment-path)
+  (let ((vertex-code (uiop:read-file-string vertex-path))
+	(fragment-code (uiop:read-file-string fragment-path)))
+    (make-shader vertex-code fragment-code)))
+
+(declaim (ftype (function (string string) shader) make-shader))
+(defun make-shader (vertex-code fragment-code)
+  (let ((vert (compile-shader :vertex-shader vertex-code))
+	(frag (compile-shader :fragment-shader fragment-code))
 	(program (gl:create-program)))
     ;; link shader
     (gl:attach-shader program vert)
@@ -15,7 +21,7 @@
     (let ((log (gl:get-program-info-log program)))
       (if (not (eql (length log) 0))
 	  (error 'shader-link-error :link-log log
-		 :vertex-path vertex-path :fragment-path fragment-path)))
+		 :vertex-code vertex-code :fragment-code fragment-code)))
     (gl:detach-shader program vert)
     (gl:detach-shader program frag)
     (gl:delete-shader vert)
@@ -25,33 +31,34 @@
 (defmethod delete-gl ((obj shader))
   (gl:delete-program (id obj)))
 
-;; helpers
 
-(declaim (ftype (function (pathname shader-type) integer) compile-shader))
-(defun compile-shader (path shader-type)
-  (let ((shader (gl:create-shader shader-type))
-	 (text (uiop:read-file-string path)))
-    (gl:shader-source shader text)
+;;; ------- Helpers -------
+
+(declaim (ftype (function (shader-type string)) compile-shader))
+(defun compile-shader (shader-type source-code)
+  (let ((shader (gl:create-shader shader-type)))
+    (gl:shader-source shader source-code)
     (gl:compile-shader shader)
     (let ((compile-log (gl:get-shader-info-log shader)))
       (if (not (eql (length compile-log) 0))
-	  (error 'shader-compile-error :compile-log compile-log :filename path)))
+	  (error 'shader-compile-error :compile-log compile-log :source source-code)))
     shader))
 
+
 (define-condition shader-compile-error (error)
-  ((compile-log :initarg :compile-log :reader compile-log)
-   (filename :initarg :filename :reader filename))
-  (:report (lambda (condition stream)
-	     (format stream "The shader at ~a could not be compiled~%~a"
-		     (filename condition) (compile-log condition)))))
+		  ((compile-log :initarg :compile-log :reader compile-log)
+		   (source :initarg :source :reader source))
+		  (:report (lambda (condition stream)
+			     (format stream "The shader with code~%~a~% could not be compiled~%~a"
+				     (source condition) (compile-log condition)))))
 
 (define-condition shader-link-error (error)
   ((link-log :initarg :link-log :reader link-log)
-   (vertex-path :initarg :vertex-path :reader vertex-path)
-   (fragment-path :initarg :fragment-path :reader fragment-path))
+   (vertex-code :initarg :vertex-code :reader vertex-code)
+   (fragment-code :initarg :fragment-code :reader fragment-code))
   (:report (lambda (condition stream)
 	     (format stream "The shader program with 
-vertex shader: \"~a\"
-fragment shader: \"~a\" 
+vertex shader code: ~%\"~a\"~%
+fragment shader code: ~%\"~a\"~% 
 could not be linked~%~a"
-		     (vertex-path condition) (fragment-path condition) (link-log condition)))))
+		     (vertex-code condition) (fragment-code condition) (link-log condition)))))

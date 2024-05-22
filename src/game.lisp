@@ -33,8 +33,10 @@
 	(height 300)
 	(visible t)
 	(clear-colour '(make-colour 0 0 0 0))
-	(cursor :normal)
-	(vsync t)) ;; normal, hidden, disabled
+	(cursor :normal) ;; normal, hidden, disabled
+	(vsync t)
+	(opengl-version-major 3)
+	(opengl-version-minor 3))
      &body body &environment env)
   `(progn
      ,(macro-check-type title string env)
@@ -43,13 +45,15 @@
      ,(macro-check-type clear-colour colour env)
      ,(macro-check-type cursor cursor-state env)
      ;; keys found in glfw:create-window
-     (glfw:with-init-window (:title ,title :width ,width :height ,height :visible ,visible)
-       (register-glfw-callbacks)
-       (glfw:set-input-mode :cursor ,cursor)
-       (pass-colour gl:clear-color ,clear-colour)
-       (glfw:swap-interval (if ,vsync 1 0))
-       (set-gl-viewport ,width ,height)
-       ,@body)))
+     (glfw:with-init-window (:title ,title :width ,width :height ,height :visible ,visible
+				    :context-version-major ,opengl-version-major
+				    :context-version-minor ,opengl-version-minor)
+			    (register-glfw-callbacks)
+			    (glfw:set-input-mode :cursor ,cursor)
+			    (pass-colour gl:clear-color ,clear-colour)
+			    (glfw:swap-interval (if ,vsync 1 0))
+			    (set-gl-viewport ,width ,height)
+			    ,@body)))
 
 
 ;;; ------------- GLFW CALLBACKS -----------------

@@ -1,3 +1,3 @@
-(defpackage gficl-examples
+(defpackage gficl-examples.basic
   (:use :cl)
-  (:export #:example))
+  (:export #:run))

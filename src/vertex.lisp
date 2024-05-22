@@ -22,27 +22,27 @@
 (defclass vertex-form ()
   ((vertex-slots :initarg :vertex-slots :accessor vertex-slots)
    (slot-offsets :initarg :slot-offsets :accessor slot-offsets)
-   (vertex-size :initarg :vertex-size :accessor vertex-size)))
+   (vertex-mem-size :initarg :vertex-mem-size :accessor vertex-mem-size)))
 
 (defun make-vertex-form (vertex-slots)
   (let* ((slot-offsets (list))
-	 (vertex-size 0))
+	 (vertex-mem-size 0))
     (loop for slot in vertex-slots
 	  do (progn
 	       (assert (typep slot 'vertex-slot))
-	       (push vertex-size slot-offsets)
+	       (push vertex-mem-size slot-offsets)
 	       (let ((slot-size
 		       (* (vector-size slot) (cffi:foreign-type-size (element-type slot)))))
-		 (setf vertex-size (+ vertex-size slot-size)))))
+		 (setf vertex-mem-size (+ vertex-mem-size slot-size)))))
     (make-instance 'vertex-form :vertex-slots vertex-slots
 				:slot-offsets (nreverse slot-offsets)
-				:vertex-size vertex-size)))
+				:vertex-mem-size vertex-mem-size)))
 
 (defparameter *3d-vertex*
   (make-vertex-form
    (list
     (make-vertex-slot 3 :float)	   ; position
-    (make-vertex-slot 3 :float)	   ; normal
+;;    (make-vertex-slot 3 :float)	   ; normal
     (make-vertex-slot 2 :float)))) ; tex coords
 
 
@@ -61,48 +61,65 @@
   (gl:delete-vertex-arrays '(vao vertex-data)))
 
 (defun make-vertex-data (vertex-form vertices indices)
-  (let* ((vao (gl:gen-vertex-array))
+  (let* ((vertex-data (vertex-list-to-array vertex-form vertices))
+	 (index-data (index-list-to-array indices))
+	 (vao (gl:gen-vertex-array))
 	 (buffers (gl:gen-buffers 2))
 	 (vbo (elt buffers 0))
 	 (ebo (elt buffers 1)))
     (gl:bind-vertex-array vao)
     (gl:bind-buffer :array-buffer vbo)
-    (gl:buffer-data :array-buffer :static-draw (vertex-list-to-array vertex-form vertices))
+    (gl:buffer-data :array-buffer :static-draw vertex-data)
     (gl:bind-buffer :element-array-buffer ebo)
-    (gl:buffer-data :element-array-buffer :static-draw (index-list-to-array indices))
+    (gl:buffer-data :element-array-buffer :static-draw index-data)
     (setup-vertex-attrib-array vertex-form)
+    (cffi:foreign-free vertex-data)
+    (gl:free-gl-array index-data)
     (make-instance 'vertex-data :vao vao :vbo vbo :ebo ebo :index-count (length indices))))
 
-(defun draw-vertex-data (vertex-data &key (verticies 0 vertp) (instances 1))
-  (assert (and (> verticies 0) (> instances 0) (<= verticies (index-count vertex-data)))
-	  (verticies instances)
-	  "draw vertex data args were out of range. verticies (~d) instances (~d)"
-	  verticies instances)
-  (if (not vertp) (setf verticies (index-count vertex-data)))
+(defun draw-vertex-data (vertex-data &key (vertices 0 vertp) (instances 1))
+  (assert (and (> vertices 0) (> instances 0) (<= vertices (index-count vertex-data)))
+	  (vertices instances)
+	  "draw vertex data args were out of range. vertices (~d) instances (~d)"
+	  vertices instances)
+  (if (not vertp) (setf vertices (index-count vertex-data)))
   (gl:bind-vertex-array (vao vertex-data))
   (if (> instances 1)
-      (%gl:draw-elements-instanced (draw-mode vertex-data) verticies :unsigned-int 0 instances)
-      (%gl:draw-elements (draw-mode vertex-data) verticies :unsigned-int 0)))
+      (%gl:draw-elements-instanced (draw-mode vertex-data) vertices :unsigned-int 0 instances)
+      (%gl:draw-elements (draw-mode vertex-data) vertices :unsigned-int 0)))
 
 
 
 ;;; ----- Helpers -----
 
+(declaim (ftype (function (vertex-form list cffi:foreign-pointer integer) integer)
+		buffer-vertex-data))
+(defun buffer-vertex-data (vertex-form vertex pointer offset)
+  ;; check vertex has all the slots in vertex form of correct type
+  ;; and copy to integer
+  ;; and increase offset and return it
+  (loop for slot in (vertex-slots vertex-form) do
+	())
+  offset)
+
 (defun vertex-list-to-array (vertex-form vertices)
   ;;todo: make this fn actually do something
-  (assert (listp vertices))
+  (assert (listp vertices) (vertices) "vertices were not in a list: ~%" vertices)
   (let* ((vertex-count (length vertices))
-	 (buff (cffi:foreign-alloc :char :count (* (vertex-size vertex-form) vertex-count))))
-    ;; TODO: validate buffer has expected form
-    ;;       fill buffer with vertex data
+	 (buff (cffi:foreign-alloc :char
+				   :count (* (vertex-mem-size vertex-form) vertex-count)))
+	 (offset 0))
+    (loop for vertex in vertices do
+	  (setf offset (buffer-vertex-data vertex-form vertex buff offset)))
     (cffi:foreign-free buff)))
 
 (defun index-list-to-array (indices)
-  (assert (listp indices))
+  (assert (listp indices) (indices) "indices were not in a list: ~a" indices)
   (let* ((count (length indices))
 	 (arr (gl:alloc-gl-array :int count)))
     (loop for i from 0 for index in indices do
-      (assert (and (typep index 'integer) (>= 0 index)))
+      (assert (and (typep index 'integer) (>= 0 index)) (index)
+	      "index ~a in indices list was not an int" index)
       (setf (gl:glaref arr i) index))
     arr))
 
@@ -114,4 +131,4 @@
 	    (gl:enable-vertex-attrib-array i)
 	    (gl:vertex-attrib-pointer
 	     i (vector-size slot) (element-type slot) nil
-	     (vertex-size vertex-form) (cffi:make-pointer offset)))))
+	     (vertex-mem-size vertex-form) (cffi:make-pointer offset)))))
