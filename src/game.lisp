@@ -72,10 +72,7 @@
     (glfw:set-window-should-close)))
 
 (defun set-gl-viewport (w h)
-  (gl:viewport 0 0 w h)
-  (gl:matrix-mode :projection)
-  (gl:load-identity)
-  (gl:ortho 0 1 0 1 -1 1))
+  (gl:viewport 0 0 w h))
 
 (glfw:def-window-size-callback resize-callback (window w h)
   (declare (ignore window))

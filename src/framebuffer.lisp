@@ -3,7 +3,7 @@
 (defclass framebuffer (gl-object)
   ((attachments :initarg :attachments :accessor attachments)))
 
-(defun create-framebuffer (attachments width height samples)
+(defun make-framebuffer (attachments width height samples)
   (declare (integer width) (integer height) (integer samples))
   (let ((id (gl:gen-framebuffer))
 	(internal-attachments ())
