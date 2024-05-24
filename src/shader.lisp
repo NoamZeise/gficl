@@ -38,7 +38,10 @@ for the vertex and fragment shader."
 (declaim (ftype (function (shader string) unsigned-byte) shader-loc))
 (defun shader-loc (shader name)
   "Get location of variable with name in shader"
-  (gl:get-uniform-location (id shader) name))
+  (let ((location (gl:get-uniform-location (id shader) name)))
+    (assert (not (= location -1)) (shader name)
+	    "Shader ~a ~%did not have a variable with name ~a" shader name)
+    location))
 
 
 ;;; ------- Helpers -------

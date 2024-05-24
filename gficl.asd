@@ -5,12 +5,14 @@
   :depends-on (:uiop
 	       :cl-glfw3
 	       :cl-opengl
-	       :cffi)
+	       :cffi
+	       :alexandria)
   :components ((:module "src"
                 :components 
                 ((:file "package")
-		 (:file "game" :depends-on ("types" "shader"))
+		 (:file "game" :depends-on ("types" "shader" "matrix"))
 		 (:file "types")
+		 (:file "matrix")
 		 (:file "shader" :depends-on ("types"))
 		 (:file "framebuffer" :depends-on ("types" "image"))
 		 (:file "image" :depends-on ("types"))

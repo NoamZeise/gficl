@@ -4,4 +4,4 @@
   :components ((:module "examples"
 		:components
 		((:file "package")
-		 (:file "example")))))
+		 (:file "basic")))))

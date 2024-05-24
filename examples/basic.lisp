@@ -6,13 +6,16 @@
 (defparameter *fb* nil)
 (defparameter *rb* nil)
 
+(defparameter *view* nil)
+(defparameter *projection* nil)
+
 (defun run ()
   (gficl::with-game
    (:title "basic")
    (setup)
    (loop until (gficl:game-closed-p)
-	 do (render)
-	 do (update))
+	 do (update)
+	 do (render))
    (cleanup)))
 
 (defun setup ()
@@ -30,7 +33,9 @@
 		  ((1 0 0) (1 0))
 		  ((1 1 0) (1 1))
 		  ((0 1 0) (0 1)))
-		'(0 3 2 2 1 0))))
+		'(0 3 2 2 1 0)))
+  (setf *view* (gficl::make-matrix 4))
+  (setf *projection* (gficl::make-matrix 4)))
 
 (defun cleanup ()
   (gficl::delete-gl *tex*)
@@ -44,13 +49,15 @@
    (gl:bind-framebuffer :framebuffer (gficl::id *fb*))
    (gl:bind-framebuffer :framebuffer 0)
    (gl:use-program (gficl::id *shader*))
-   ;;(gl:uniform-matrix-4fv (gficl::shader-loc *shader* "view") (gl:uniform))
-   ;(gl:clear-color 0.2 0.1 0.4 1)
-   ;(gl:clear :color-buffer :depth-buffer)
+   (gficl::set-shader-matrix *shader* "view" *view*)
+   (gficl::set-shader-matrix *shader* "projection" *projection*)
    (gficl::draw-vertex-data *quad*)))
 
 (defun update ()
-  (gficl::with-update))
+  (gficl::with-update
+   (destructuring-bind (w h) (glfw:get-window-size)
+		       ;;(setf *projection* (gficl::ortho-matrix w h 0 1))
+		       )))
 
 
 (defparameter *vert-shader*
@@ -68,8 +75,8 @@ uniform mat4 view;
 void main()
 {
     TexCoords = inTexCoords;
-    gl_Position =  //projection * view * model *
- vec4(vertex, 1.0);
+//projection * view * model *
+    gl_Position = projection * view * vec4(vertex, 1.0);
 }")
 (defparameter *frag-shader*
 "#version 330
