@@ -5,8 +5,7 @@
   :depends-on (:uiop
 	       :cl-glfw3
 	       :cl-opengl
-	       :cffi
-	       :alexandria)
+	       :cffi)
   :components ((:module "src"
                 :components 
                 ((:file "package")

@@ -6,15 +6,13 @@
   (:documentation "N dimensional matrix"))
 
 (defmethod print-object ((obj matrix) out)
-	   (print-unreadable-object
-	    (obj out :type t)
-	    (format out "~ax~a~{~%~a~}"
-		    (dimension obj) (dimension obj)
-		    (slot-value obj 'data))))
+  (print-unreadable-object
+   (obj out :type t)
+   (format out "~ax~a~{~%~a~}"
+	   (dimension obj) (dimension obj)
+	   (slot-value obj 'data))))
 
-(defun make-matrix (dimension &key
-			      (element-fn (lambda (i j)
-					    (if (equalp i j) 1 0))))
+(defun make-matrix (dimension &key (element-fn (lambda (i j) (if (equalp i j) 1 0))))
   "Create a matrix with a given dimension - default is identity"
   (assert ( > dimension 0) (dimension) "Dimension must be greater than zero")
   (let ((data (loop for i from 1 to dimension collecting
@@ -22,7 +20,7 @@
 			  (funcall element-fn i j)))))
     (make-instance 'matrix :dimension dimension :data data)))
 
-
+(declaim (ftype (function (list) matrix) make-matrix-from-data))
 (defun make-matrix-from-data (data)
   "data is a list of rows for the matrix"
   (let ((dim (length data)))
@@ -36,22 +34,22 @@
 
 (declaim (ftype (function (matrix &rest matrix) matrix) *-mat))
 (defun *-mat (mat1 &rest mats)
-  (if (car mats)
-      (let ((dim (dimension mat1))
-	    (mat2 (car mats)))
-	(declare (type matrix mat2))
-	(assert (equalp dim (dimension mat2))
-		(mat1 mat2) "matricies had different dimensions: ~a ~a"
-		mat1 mat2)
-	(apply #'*-mat
-	       (make-matrix-from-data
-		(loop for row1 in (slot-value mat1 'data) collecting
-		      (loop for i from 0 to (- dim 1) collecting
-			    (loop for row2 in (slot-value mat2 'data)
-				  for dat in row1 summing
-				  (* dat (nth i row2))))))
-	       (cdr mats)))
-    mat1))
+  (if (not (car mats))
+      mat1
+    (let ((dim (dimension mat1))
+	  (mat2 (car mats)))
+      (declare (type matrix mat2))
+      (assert (equalp dim (dimension mat2)) (mat1 mat2)
+	      "matricies had different dimensions: ~a ~a" mat1 mat2)
+      (apply #'*-mat
+	     (make-matrix-from-data
+	      ;; multiply mat1 and mat2
+	      (loop for row1 in (slot-value mat1 'data) collecting
+		    (loop for i from 0 to (- dim 1) collecting
+			  (loop for row2 in (slot-value mat2 'data)
+				for dat in row1 summing
+				(* dat (nth i row2))))))
+	     (cdr mats)))))
 
 ;;; --- common matrices ---
 
@@ -79,17 +77,27 @@
      (0 0 1 0)
      (0 0 0 1))))
 
-(defun ortho-matrix (width height near far)
+(declaim (ftype (function (number number number number number number) matrix)
+		ortho-matrix))
+(defun ortho-matrix (top bottom left right near far)
   "create a 4x4 orthographic projection matrix"
-  (assert (and (> width 0) (> height 0)) ()
-	  "ortho width or height was not positive")
-  (assert (< near far) () "near was not less than far")
-  (let ((top 0) (bottom height) (left 0) (right width))
-    (make-matrix-from-data
-     `((,(/ 2 (- right left)) 0 0 ,(- (/ (+ right left) (- right left))))
-       (0 ,(/ 2 (- top bottom)) 0 ,(- (/ (+ top bottom) (- top bottom))))
-       (0 0 ,(/ -2 (- far near))  ,(- (/ (+ far near) (- far near))))
-       (0 0 0 1)))))
+  (assert (not (or (equal top bottom)
+		   (equal left right)
+		   (equal near far)))
+	  (top bottom left right near far)
+	  "ortho matrix must have top!=bottom left!=right near!=nar")
+  (make-matrix-from-data
+   `((,(/ 2 (- right left)) 0 0 ,(- (/ (+ right left) (- right left))))
+     (0 ,(/ 2 (- top bottom)) 0 ,(- (/ (+ top bottom) (- top bottom))))
+     (0 0 ,(/ -2 (- far near))  ,(- (/ (+ far near) (- far near))))
+     (0 0 0 1))))
+
+(declaim (ftype (function (number number) matrix) screen-ortho-matrix))
+(defun screen-ortho-matrix (width height)
+  "return an orthogonal projection matrix with depth 0 to 1"
+  (assert (and (> width 0) (> height 0)) (width height)
+	  "ortho width and height must be positive: ~ax~a" width height)
+  (ortho-matrix 0 height 0 width 0 -1))
 
 ;;; --- set shader matricies ---
 

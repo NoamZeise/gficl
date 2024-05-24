@@ -75,7 +75,7 @@
 		 internal-time-units-per-second))
    (setf *rot* (+ *rot* (* *dt* 1)))
    (destructuring-bind (w h) (glfw:get-window-size)
-		       (setf *projection* (gficl::ortho-matrix w h 0 1)))
+		       (setf *projection* (gficl::screen-ortho-matrix w h)))
    (setf *model* (gficl::*-mat		  
 		  (gficl::translation-matrix 150 100 0)
 		  (gficl::2d-rotation-matrix *rot*)
