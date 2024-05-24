@@ -15,29 +15,80 @@
 (defun make-matrix (dimension &key
 			      (element-fn (lambda (i j)
 					    (if (equalp i j) 1 0))))
+  "Create a matrix with a given dimension - default is identity"
   (assert ( > dimension 0) (dimension) "Dimension must be greater than zero")
   (let ((data (loop for i from 1 to dimension collecting
 		    (loop for j from 1 to dimension collecting
 			  (funcall element-fn i j)))))
     (make-instance 'matrix :dimension dimension :data data)))
 
+
 (defun make-matrix-from-data (data)
+  "data is a list of rows for the matrix"
   (let ((dim (length data)))
     (loop for row in data do
 	  (assert (= dim (length row)) (data)
 		  "matrix data was malformed, need n by n matrix rows: ~a" data))
     (make-instance 'matrix :dimension dim :data data)))
 
+
+;;; --- matrix operations ---
+
+(declaim (ftype (function (matrix &rest matrix) matrix) *-mat))
+(defun *-mat (mat1 &rest mats)
+  (if (car mats)
+      (let ((dim (dimension mat1))
+	    (mat2 (car mats)))
+	(declare (type matrix mat2))
+	(assert (equalp dim (dimension mat2))
+		(mat1 mat2) "matricies had different dimensions: ~a ~a"
+		mat1 mat2)
+	(apply #'*-mat
+	       (make-matrix-from-data
+		(loop for row1 in (slot-value mat1 'data) collecting
+		      (loop for i from 0 to (- dim 1) collecting
+			    (loop for row2 in (slot-value mat2 'data)
+				  for dat in row1 summing
+				  (* dat (nth i row2))))))
+	       (cdr mats)))
+    mat1))
+
+;;; --- common matrices ---
+
+(defun scale-matrix (x y z)
+  "return a 4x4 scaling matrix"
+  (make-matrix-from-data
+   `((,x  0  0 0)
+     ( 0 ,y  0 0)
+     ( 0  0 ,z 0)
+     ( 0  0  0 1))))
+
+(defun translation-matrix (x y z)
+  "returns a 4x4 translation matrix"
+  (make-matrix-from-data
+   `((1 0 0 ,x)
+     (0 1 0 ,y)
+     (0 0 1 ,z)
+     (0 0 0  1))))
+
+(defun 2d-rotation-matrix (angle)
+  "returns a 4x4 rotation matrix"
+  (make-matrix-from-data
+   `((,(cos angle) ,(- (sin angle)) 0 0)
+     (,(sin angle) ,(cos angle) 0 0)
+     (0 0 1 0)
+     (0 0 0 1))))
+
 (defun ortho-matrix (width height near far)
   "create a 4x4 orthographic projection matrix"
   (assert (and (> width 0) (> height 0)) ()
 	  "ortho width or height was not positive")
   (assert (< near far) () "near was not less than far")
-  (let ((top height) (bottom 0) (left 0) (right width))
+  (let ((top 0) (bottom height) (left 0) (right width))
     (make-matrix-from-data
      `((,(/ 2 (- right left)) 0 0 ,(- (/ (+ right left) (- right left))))
        (0 ,(/ 2 (- top bottom)) 0 ,(- (/ (+ top bottom) (- top bottom))))
-       (0 0 ,(/ 2 (- far near)) ,(- (/ (+ far near) (- far near))))
+       (0 0 ,(/ -2 (- far near))  ,(- (/ (+ far near) (- far near))))
        (0 0 0 1)))))
 
 ;;; --- set shader matricies ---
@@ -63,6 +114,10 @@
 ;;; ---- Helpers ----
 
 (defun make-foreign-matrix-array (matrix)
-  (let* ((entries (alexandria:flatten (slot-value matrix 'data)))
-	 (floats (map 'list #'float entries)))
-    (cffi:foreign-alloc :float :initial-contents floats)))
+  (let* ((floats (list)))
+    ;; OpenGL has column major matrix representation
+    (loop for i from 1 to (dimension matrix) do
+	  (loop for row in
+		(slot-value matrix 'data)
+		do (push (coerce (nth (- i 1) row) 'single-float) floats)))
+    (cffi:foreign-alloc :float :initial-contents (nreverse floats))))

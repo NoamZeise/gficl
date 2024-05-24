@@ -1,13 +1,20 @@
 (in-package :gficl-examples.basic)
 
+
+;; glfw objects
 (defparameter *tex* nil)
 (defparameter *shader* nil)
 (defparameter *quad* nil)
 (defparameter *fb* nil)
 (defparameter *rb* nil)
 
+;; shader data
 (defparameter *view* nil)
 (defparameter *projection* nil)
+
+;; object data
+(defparameter *model* nil)
+(defparameter *rot* nil)
 
 (defun run ()
   (gficl::with-game
@@ -35,7 +42,10 @@
 		  ((0 1 0) (0 1)))
 		'(0 3 2 2 1 0)))
   (setf *view* (gficl::make-matrix 4))
-  (setf *projection* (gficl::make-matrix 4)))
+  (setf *projection* (gficl::make-matrix 4))
+
+  (setf *model* (gficl::make-matrix 4))
+  (setf *rot* 0))
 
 (defun cleanup ()
   (gficl::delete-gl *tex*)
@@ -51,13 +61,26 @@
    (gl:use-program (gficl::id *shader*))
    (gficl::set-shader-matrix *shader* "view" *view*)
    (gficl::set-shader-matrix *shader* "projection" *projection*)
+   (gficl::set-shader-matrix *shader* "model" *model*)
    (gficl::draw-vertex-data *quad*)))
+
+(defparameter *last-stamp* 0)
+(defparameter *this-stamp* 0)
+(defparameter *dt* 1)
 
 (defun update ()
   (gficl::with-update
+   (setf *this-stamp* (get-internal-real-time))
+   (setf *dt* (/ (- *this-stamp* *last-stamp*)
+		 internal-time-units-per-second))
+   (setf *rot* (+ *rot* (* *dt* 1)))
    (destructuring-bind (w h) (glfw:get-window-size)
-		       ;;(setf *projection* (gficl::ortho-matrix w h 0 1))
-		       )))
+		       (setf *projection* (gficl::ortho-matrix w h 0 1)))
+   (setf *model* (gficl::*-mat		  
+		  (gficl::translation-matrix 150 100 0)
+		  (gficl::2d-rotation-matrix *rot*)
+		  (gficl::scale-matrix 100 50 1))))
+  (setf *last-stamp* *this-stamp*))
 
 
 (defparameter *vert-shader*
@@ -75,8 +98,7 @@ uniform mat4 view;
 void main()
 {
     TexCoords = inTexCoords;
-//projection * view * model *
-    gl_Position = projection * view * vec4(vertex, 1.0);
+    gl_Position = projection * view * model * vec4(vertex, 1.0);
 }")
 (defparameter *frag-shader*
 "#version 330
