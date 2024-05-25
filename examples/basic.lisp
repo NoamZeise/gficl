@@ -1,6 +1,5 @@
 (in-package :gficl-examples.basic)
 
-
 ;; glfw objects
 (defparameter *tex* nil)
 (defparameter *shader* nil)
@@ -29,7 +28,7 @@
   (setf *tex*
 	(gficl::make-texture
 	 :rgb 100 100))
-  (setf *shader* (gficl::make-shader *vert-shader* *frag-shader*))
+  (setf *shader* (gficl:make-shader *vert-shader* *frag-shader*))
   (setf *fb* (gficl::make-framebuffer '((:color-attachment0 :texture)
 					(:depth-stencil-attachment :renderbuffer))
 				      100 100 1))
@@ -48,39 +47,31 @@
   (setf *rot* 0))
 
 (defun cleanup ()
-  (gficl::delete-gl *tex*)
-  (gficl::delete-gl *shader*)
-  (gficl::delete-gl *fb*)
-  (gficl::delete-gl *rb*)
-  (gficl::delete-gl *quad*))
+  (gficl:delete-gl *tex*)
+  (gficl:delete-gl *shader*)
+  (gficl:delete-gl *fb*)
+  (gficl:delete-gl *rb*)
+  (gficl:delete-gl *quad*))
 
 (defun render ()
-  (gficl::with-render
+  (gficl:with-render
    (gl:bind-framebuffer :framebuffer (gficl::id *fb*))
    (gl:bind-framebuffer :framebuffer 0)
    (gl:use-program (gficl::id *shader*))
-   (gficl::set-shader-matrix *shader* "view" *view*)
-   (gficl::set-shader-matrix *shader* "projection" *projection*)
-   (gficl::set-shader-matrix *shader* "model" *model*)
-   (gficl::draw-vertex-data *quad*)))
-
-(defparameter *last-stamp* 0)
-(defparameter *this-stamp* 0)
-(defparameter *dt* 1)
+   (gficl:set-shader-matrix *shader* "view" *view*)
+   (gficl:set-shader-matrix *shader* "projection" *projection*)
+   (gficl:set-shader-matrix *shader* "model" *model*)
+   (gficl:draw-vertex-data *quad*)))
 
 (defun update ()
-  (gficl::with-update
-   (setf *this-stamp* (get-internal-real-time))
-   (setf *dt* (/ (- *this-stamp* *last-stamp*)
-		 internal-time-units-per-second))
-   (setf *rot* (+ *rot* (* *dt* 1)))
+  (gficl:with-update (dt)
+   (setf *rot* (+ *rot* (* dt 1)))
    (destructuring-bind (w h) (glfw:get-window-size)
-		       (setf *projection* (gficl::screen-ortho-matrix w h)))
-   (setf *model* (gficl::*-mat		  
-		  (gficl::translation-matrix 150 100 0)
-		  (gficl::2d-rotation-matrix *rot*)
-		  (gficl::scale-matrix 100 50 1))))
-  (setf *last-stamp* *this-stamp*))
+		       (setf *projection* (gficl:screen-ortho-matrix w h)))
+   (setf *model* (gficl:*-mat		  
+		  (gficl:translation-matrix 150 100 0)
+		  (gficl:2d-rotation-matrix *rot*)
+		  (gficl:scale-matrix 100 50 1)))))
 
 
 (defparameter *vert-shader*

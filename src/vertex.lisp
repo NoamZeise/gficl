@@ -15,6 +15,8 @@
 
 (declaim (ftype (function (integer vertex-elem-type) vertex-slot) make-vertex-slot))
 (defun make-vertex-slot (vector-size element-type)
+  "define an element of a vertex in a shader. 
+ie position, normal, texcoords, etc."
   (make-instance 'vertex-slot :vector-size vector-size :element-type element-type))
 
 (defclass vertex-form ()
@@ -23,6 +25,8 @@
    (vertex-mem-size :initarg :vertex-mem-size :accessor vertex-mem-size)))
 
 (defun make-vertex-form (vertex-slots)
+  "define a vertex shader input based on the supplied vertex slots.
+The order must match the vertex locations in the shader"
   (let* ((slot-offsets (list))
 	 (vertex-mem-size 0))
     (loop for slot in vertex-slots
@@ -33,14 +37,13 @@
 		      (* (vector-size slot) (cffi:foreign-type-size (element-type slot)))))
 		 (setf vertex-mem-size (+ vertex-mem-size slot-size)))))
     (make-instance 'vertex-form :vertex-slots vertex-slots
-				:slot-offsets (nreverse slot-offsets)
-				:vertex-mem-size vertex-mem-size)))
+		   :slot-offsets (nreverse slot-offsets)
+		   :vertex-mem-size vertex-mem-size)))
 
 (defparameter *3d-vertex*
   (make-vertex-form
    (list
     (make-vertex-slot 3 :float)	   ; position
-;;    (make-vertex-slot 3 :float)	   ; normal
     (make-vertex-slot 2 :float)))) ; tex coords
 
 ;;; ----- OpenGL vertex arrays -----
