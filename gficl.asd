@@ -9,9 +9,9 @@
   :components ((:module "src"
                 :components 
                 ((:file "package")
-		 (:file "game" :depends-on ("types" "shader" "matrix"))
+		 (:file "gficl" :depends-on ("matrix" "vertex" "framebuffer"))
 		 (:file "types")
-		 (:file "matrix")
+		 (:file "matrix" :depends-on ("shader"))
 		 (:file "shader" :depends-on ("types"))
 		 (:file "framebuffer" :depends-on ("types" "image"))
 		 (:file "image" :depends-on ("types"))

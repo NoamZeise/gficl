@@ -2,11 +2,10 @@
   (:use :cl)
   (:export
 
-   #:with-game
+   #:with-window
    #:with-update
    #:with-render
-   #:set-game-should-close
-   #:game-closed-p
+   #:closed-p
    #:delete-gl
 
    ;; colour
@@ -20,9 +19,14 @@
    #:make-vertex-data
    #:draw-vertex-data
 
+   ;; image
+
+   ;; framebuffer
+
    ;; shader
-   #:make-shader-from-path
    #:make-shader
+   #:make-shader-from-path
+   #:shader-loc
 
    ;; matrices
    #:set-shader-matrix

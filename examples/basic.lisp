@@ -16,10 +16,9 @@
 (defparameter *rot* nil)
 
 (defun run ()
-  (gficl::with-game
-   (:title "basic")
+  (gficl:with-window (:title "basic")
    (setup)
-   (loop until (gficl:game-closed-p)
+   (loop until (gficl:closed-p)
 	 do (update)
 	 do (render))
    (cleanup)))
@@ -29,9 +28,10 @@
 	(gficl::make-texture
 	 :rgb 100 100))
   (setf *shader* (gficl:make-shader *vert-shader* *frag-shader*))
-  (setf *fb* (gficl::make-framebuffer '((:color-attachment0 :texture)
-					(:depth-stencil-attachment :renderbuffer))
-				      100 100 1))
+  (setf *fb* (gficl::make-framebuffer
+	      '((:color-attachment0 :texture)
+		(:depth-stencil-attachment :renderbuffer))
+	      100 100 1))
   (setf *rb* (gficl::make-renderbuffer :rgb 100 100 1))
   (setf *quad* (gficl::make-vertex-data
 		gficl::*3d-vertex*
