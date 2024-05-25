@@ -99,4 +99,4 @@ gives the seconds since last update"
 
 (glfw:def-window-size-callback resize-callback (window w h)
   (declare (ignore window))
-  (set-gl-viewport w h))
+  (gl:viewport 0 0 w h))
