@@ -67,7 +67,7 @@
 		   (:depth-stencil-attachment :depth24-stencil8)))
 	 (res (ecase resource-type
 		(:texture
-		 (make-texture format width height :samples samples :wrap :clamp-to-border))
+		 (make-texture width height :format format :samples samples :wrap :clamp-to-border))
 		(:renderbuffer
 		 (make-renderbuffer format width height samples)))))
     (make-instance 'attachment :position position :res res :res-type resource-type)))

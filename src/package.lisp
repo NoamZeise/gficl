@@ -19,7 +19,7 @@
    #:make-vertex-data
    #:draw-vertex-data
 
-   ;; image
+   ;; image   
 
    ;; framebuffer
 

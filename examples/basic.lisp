@@ -1,79 +1,23 @@
 (in-package :gficl-examples.basic)
 
-;; glfw objects
+;; opengl objects
 (defparameter *tex* nil)
 (defparameter *shader* nil)
 (defparameter *quad* nil)
 (defparameter *fb* nil)
 (defparameter *rb* nil)
 
+;; shader input
+(defparameter *vertex-format*
+   (gficl:make-vertex-form
+    (list (gficl:make-vertex-slot 3 :float)
+	  (gficl:make-vertex-slot 2 :float))))
+
 ;; shader data
 (defparameter *view* nil)
 (defparameter *projection* nil)
 
-;; object data
-(defparameter *model* nil)
-(defparameter *rot* nil)
-
-(defun run ()
-  (gficl:with-window (:title "basic")
-   (setup)
-   (loop until (gficl:closed-p)
-	 do (update)
-	 do (render))
-   (cleanup)))
-
-(defun setup ()
-  (setf *tex*
-	(gficl::make-texture
-	 :rgb 100 100))
-  (setf *shader* (gficl:make-shader *vert-shader* *frag-shader*))
-  (setf *fb* (gficl::make-framebuffer
-	      '((:color-attachment0 :texture)
-		(:depth-stencil-attachment :renderbuffer))
-	      100 100 1))
-  (setf *rb* (gficl::make-renderbuffer :rgb 100 100 1))
-  (setf *quad* (gficl::make-vertex-data
-		gficl::*3d-vertex*
-		'(((0 0 0) (0 0))
-		  ((1 0 0) (1 0))
-		  ((1 1 0) (1 1))
-		  ((0 1 0) (0 1)))
-		'(0 3 2 2 1 0)))
-  (setf *view* (gficl::make-matrix 4))
-  (setf *projection* (gficl::make-matrix 4))
-
-  (setf *model* (gficl::make-matrix 4))
-  (setf *rot* 0))
-
-(defun cleanup ()
-  (gficl:delete-gl *tex*)
-  (gficl:delete-gl *shader*)
-  (gficl:delete-gl *fb*)
-  (gficl:delete-gl *rb*)
-  (gficl:delete-gl *quad*))
-
-(defun render ()
-  (gficl:with-render
-   (gl:bind-framebuffer :framebuffer (gficl::id *fb*))
-   (gl:bind-framebuffer :framebuffer 0)
-   (gl:use-program (gficl::id *shader*))
-   (gficl:set-shader-matrix *shader* "view" *view*)
-   (gficl:set-shader-matrix *shader* "projection" *projection*)
-   (gficl:set-shader-matrix *shader* "model" *model*)
-   (gficl:draw-vertex-data *quad*)))
-
-(defun update ()
-  (gficl:with-update (dt)
-   (setf *rot* (+ *rot* (* dt 1)))
-   (destructuring-bind (w h) (glfw:get-window-size)
-		       (setf *projection* (gficl:screen-ortho-matrix w h)))
-   (setf *model* (gficl:*-mat		  
-		  (gficl:translation-matrix 150 100 0)
-		  (gficl:2d-rotation-matrix *rot*)
-		  (gficl:scale-matrix 100 50 1)))))
-
-
+;; shaders
 (defparameter *vert-shader*
 	      "#version 330
 layout (location = 0) in vec3 vertex;
@@ -97,7 +41,80 @@ void main()
 in vec2 TexCoords;
 out vec4 colour;
 
+uniform sampler2D tex;
+
 void main() {
-     colour = vec4(TexCoords.x, TexCoords.y, 0, 1);
+     colour = texture(tex, TexCoords);
 }
 ")
+
+;; object data
+(defparameter *model* nil)
+(defparameter *rot* nil)
+
+(defun run ()
+  (gficl:with-window (:title "basic")
+   (setup)
+   (loop until (gficl:closed-p)
+	 do (update)
+	 do (render))
+   (cleanup)))
+
+(defun setup ()
+  (setf *tex*
+	(gficl::make-texture-with-fn 10 10
+	   #'(lambda (x y)
+	       (list (floor (* 255 (/ x 10)))
+		     (floor (* 255 (/ y 10))) 255 255))))
+  
+  (setf *shader* (gficl:make-shader *vert-shader* *frag-shader*))
+
+  (setf *fb* (gficl::make-framebuffer
+	      '((:color-attachment0 :texture)
+		(:depth-stencil-attachment :renderbuffer))
+	      100 100 1))
+
+  (setf *rb* (gficl::make-renderbuffer :rgb 100 100 1))
+
+  (setf *quad* (gficl::make-vertex-data
+		*vertex-format*
+		'(((0 0 0) (0 0))
+		  ((1 0 0) (1 0))
+		  ((1 1 0) (1 1))
+		  ((0 1 0) (0 1)))
+		'(0 3 2 2 1 0)))
+
+  (setf *view* (gficl::make-matrix 4))
+  (setf *projection* (gficl::make-matrix 4))
+
+  (setf *model* (gficl::make-matrix 4))
+  (setf *rot* 0))
+
+(defun cleanup ()
+  (gficl:delete-gl *tex*)
+  (gficl:delete-gl *shader*)
+  (gficl:delete-gl *fb*)
+  (gficl:delete-gl *rb*)
+  (gficl:delete-gl *quad*))
+
+(defun render ()
+  (gficl:with-render
+   (gl:bind-framebuffer :framebuffer (gficl::id *fb*))
+   (gl:bind-framebuffer :framebuffer 0)
+   (gl:use-program (gficl::id *shader*))
+   (gficl:set-shader-matrix *shader* "view" *view*)
+   (gficl:set-shader-matrix *shader* "projection" *projection*)
+   (gficl:set-shader-matrix *shader* "model" *model*)
+   (gl:active-texture :texture0)
+   (gficl::bind-texture *tex*)
+   (gficl:draw-vertex-data *quad*)))
+
+(defun update ()
+  (gficl:with-update (dt)
+   (setf *rot* (+ *rot* (* dt 1)))
+   (destructuring-bind (w h) (glfw:get-window-size)
+		       (setf *projection* (gficl:screen-ortho-matrix w h)))
+   (setf *model* (gficl:*-mat		  
+		  (gficl:translation-matrix 250 250 0)
+		  (gficl:2d-rotation-matrix *rot*)
+		  (gficl:scale-matrix 250 250 1)))))

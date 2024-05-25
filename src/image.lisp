@@ -15,10 +15,10 @@
   '(member :clamp-to-edge :clamp-to-border :mirrored-repeat :repeat :mirrored-clamp-to-edge))
 (deftype texture-filter () '(member :nearest :linear))
 
-(defun make-texture (format
-		     width
+(defun make-texture (width
 		     height
 		     &key
+		     (format :rgba)
 		     (samples 1)
 		     (data (cffi:null-pointer))
 		     (mipmapping nil)
@@ -26,8 +26,9 @@
 		     (filter :nearest))
   (declare (image-format format) (integer width) (integer height) (integer samples)
 	   (texture-wrap wrap) (texture-filter filter))
-  "Make a texture, will be a multisample image if samples > 1.
-Data is a pointer to unsigned bytes or unsigned byte array."
+  "Make a texture, will be a multisample image if samples > 1 
+(in this case the data argument is not used) .
+Data is a pointer to unsigned bytes or unsigned byte array, one byte for each channel."
   (assert (and (> width 0) (> height 0) (> samples 0)) (width height samples)
 	  "Width (~d) Height (~d) Samples (~d) must all be greater than 0" width height samples)
   (let ((id (gl:gen-texture))
@@ -45,8 +46,30 @@ Data is a pointer to unsigned bytes or unsigned byte array."
     (gl:bind-texture type 0)
     (make-instance 'texture :id id :tex-type type)))
 
+(defun make-texture-with-fn (width height fn)
+  (let ((channels 4))
+    (cffi:with-foreign-pointer (data (* width height channels))
+      (loop for x from 0 to (- width 1) do
+	    (loop for y from 0 to (- height 1) do
+		  (let ((bytes (funcall fn x y)))
+		    (assert (= channels (length bytes)) (bytes)
+			    "~a did not have the correct number of bytes" bytes)
+		    (loop for channel from 0 to (- channels 1)
+			  for value in bytes do
+			  (assert (and (integerp value) (>= value 0) (<= value 255))
+				  (data) "~a was not a byte" data)
+			  (setf (cffi:mem-aref
+				 data :uchar
+				 (+ (* y width channels) (* x channels)
+				    channel))
+				value)))))
+			       (gficl::make-texture width height :data data))))
+
 (defmethod delete-gl ((obj texture))
-  (gl:delete-texture (id obj)))
+	   (gl:delete-texture (id obj)))
+
+(defun bind-texture (tex)
+  (gl:bind-texture (tex-type tex) (id tex)))
 
 
 ;;; --------- Renderbuffer -----------
