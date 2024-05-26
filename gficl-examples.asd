@@ -1,6 +1,9 @@
+(require 'asdf)
+(load "gficl.asd")
 (in-package :asdf-user)
 (defsystem :gficl-examples
-  :build-operation "program-op"
+  :defsystem-depends-on (:deploy)
+  :build-operation "deploy-op"
   :build-pathname "basic"
   :entry-point "gficl-examples.basic:run"
   :depends-on (:gficl)

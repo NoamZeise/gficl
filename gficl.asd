@@ -1,3 +1,4 @@
+(require 'asdf)
 (in-package :asdf-user)
 
 (defsystem :gficl
