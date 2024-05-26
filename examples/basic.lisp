@@ -52,14 +52,6 @@ void main() {
 (defparameter *model* nil)
 (defparameter *rot* nil)
 
-(defun run ()
-  (gficl:with-window (:title "basic")
-   (setup)
-   (loop until (gficl:closed-p)
-	 do (update)
-	 do (render))
-   (cleanup)))
-
 (defun setup ()
   (setf *tex*
 	(gficl::make-texture-with-fn 10 10
@@ -97,6 +89,16 @@ void main() {
   (gficl:delete-gl *rb*)
   (gficl:delete-gl *quad*))
 
+
+(defun run ()
+  (gficl:with-window (:title "basic" :width 1000 :height 1000)
+    (setup)
+    (loop until (gficl:closed-p)
+	  do (update)
+	  do (render))
+    (cleanup)))
+
+
 (defun render ()
   (gficl:with-render
    (gl:bind-framebuffer :framebuffer (gficl::id *fb*))
@@ -106,15 +108,18 @@ void main() {
    (gficl:set-shader-matrix *shader* "projection" *projection*)
    (gficl:set-shader-matrix *shader* "model" *model*)
    (gl:active-texture :texture0)
-   (gficl::bind-texture *tex*)
+   (gficl::bind-texture *tex*)   
    (gficl:draw-vertex-data *quad*)))
 
 (defun update ()
   (gficl:with-update (dt)
    (setf *rot* (+ *rot* (* dt 1)))
+   ;(if (> dt 0) (format t "fps: ~a~%" (round (/ 1 dt))))
    (destructuring-bind (w h) (glfw:get-window-size)
 		       (setf *projection* (gficl:screen-ortho-matrix w h)))
-   (setf *model* (gficl:*-mat		  
+   (setf *model* (gficl:*-mat
+		  (gficl:translation-matrix 200 200 0)
 		  (gficl:translation-matrix 250 250 0)
 		  (gficl:2d-rotation-matrix *rot*)
-		  (gficl:scale-matrix 250 250 1)))))
+		  (gficl:translation-matrix -250 -250 0)
+		  (gficl:scale-matrix 500 500 1)))))
