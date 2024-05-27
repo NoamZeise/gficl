@@ -2,17 +2,20 @@ FROM debian:bookworm
 
 WORKDIR /
 RUN apt update
-RUN apt -y install git curl sbcl libglfw3 libglx0 libzstd-dev
+RUN apt -y install git curl make sbcl libglfw3 libglx0 libzstd-dev
 RUN curl -O https://beta.quicklisp.org/quicklisp.lisp
 RUN sbcl --load quicklisp.lisp \
          --eval "(quicklisp-quickstart:install)" \
-	 --eval "(ql:quickload :deploy)" \
+	 --eval '(ql-dist:install-dist "http://dist.shirakumo.org/shirakumo.txt" :prompt nil)' \
          --quit
-RUN echo '(load "/root/quicklisp/setup.lisp")' >> /root/.sbclrc
+RUN echo '(load "~/quicklisp/setup.lisp")' >> ~/.sbclrc
 
 # RUN git clone https://github.com/NoamZeise/gficl.git
 WORKDIR /gficl
-COPY . .
-RUN sbcl --load "gficl-examples.asd" \
-         --eval "(ql:quickload :gficl-examples)" \
-	 --eval "(asdf:make :gficl-examples)"
+# COPY . .
+
+# -- to build and run --
+# docker build -t gficl
+# docker run -it --rm -v=.:/gficl gficl
+# make
+# exit
