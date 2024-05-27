@@ -59,6 +59,7 @@ The order must match the vertex locations in the shader"
   (gl:delete-buffers (list (vbo obj) (ebo obj)))
   (gl:delete-vertex-arrays (list (vao obj))))
 
+(declaim (ftype (function (vertex-form list list) (values vertex-data &optional)) make-vertex-data))
 (defun make-vertex-data (vertex-form vertices indices)
   "Create vertex data using the verticies matching vertex-form"
   (let* ((vertex-data (vertex-list-to-array vertex-form vertices))
@@ -80,6 +81,7 @@ The order must match the vertex locations in the shader"
     (gl:free-gl-array index-data)
     (make-instance 'vertex-data :vao vao :vbo vbo :ebo ebo :index-count (length indices))))
 
+(declaim (ftype (function (vertex-data &key (vertices number)))))
 (defun draw-vertex-data (vertex-data &key (vertices 0 vertp) (instances 1))
   (if (not vertp) (setf vertices (index-count vertex-data)))
   (assert (and (> vertices 0) (> instances 0) (<= vertices (index-count vertex-data)))
@@ -89,14 +91,12 @@ The order must match the vertex locations in the shader"
   (gl:bind-vertex-array (vao vertex-data))
   (if (> instances 1)
       (%gl:draw-elements-instanced (draw-mode vertex-data) vertices :unsigned-int 0 instances)
-      (%gl:draw-elements (draw-mode vertex-data) vertices :unsigned-int 0)))
+    (%gl:draw-elements (draw-mode vertex-data) vertices :unsigned-int 0)))
 
 
 
 ;;; ----- Helpers -----
 
-(declaim (ftype (function (vertex-form list cffi:foreign-pointer integer) integer)
-		buffer-vertex-data))
 (defun buffer-vertex-data (vertex-form vertex pointer offset)
   (assert (equalp (length vertex) (length (vertex-slots vertex-form))) (vertex)
 	  "vertex data did not match vertex form: ~a" vertex)

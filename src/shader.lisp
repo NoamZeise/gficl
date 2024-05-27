@@ -39,7 +39,7 @@ for the vertex and fragment shader."
 (defun shader-loc (shader name)
   "Get location of the uniform with name in the shader"
   (let ((location (gl:get-uniform-location (id shader) name)))
-    (assert (not (= location -1)) (shader name)
+    (assert (not (= location -1)) ()
 	    "Shader ~a ~%did not have a variable with name ~a" shader name)
     location))
 

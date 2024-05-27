@@ -9,6 +9,7 @@
    (a :initform 0.0 :accessor a :type float))
   (:documentation "colour channels intensity in range 0.0 to 1.0"))
 
+(declaim (ftype (function (number number number number) colour) make-colour))
 (defun make-colour (r g b a)
   (let ((colour (make-instance 'colour)))
     (setf (r colour) (float r))

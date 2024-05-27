@@ -20,13 +20,13 @@
 			  (funcall element-fn i j)))))
     (make-instance 'matrix :dimension dimension :data data)))
 
-(declaim (ftype (function (list) matrix) make-matrix-from-data))
+(declaim (ftype (function (list) (values matrix &optional)) make-matrix-from-data))
 (defun make-matrix-from-data (data)
   "data is a list of rows for the matrix"
   (let ((dim (length data)))
     (loop for row in data do
-	  (assert (= dim (length row)) (data)
-		  "matrix data was malformed, need n by n matrix rows: ~a" data))
+	  (assert (= dim (length row)) (row)
+		  "matrix data was malformed, need nxn matrix -  row data: ~a" row))
     (make-instance 'matrix :dimension dim :data data)))
 
 
@@ -39,7 +39,7 @@
     (let ((dim (dimension mat1))
 	  (mat2 (car mats)))
       (declare (type matrix mat2))
-      (assert (equalp dim (dimension mat2)) (mat1 mat2)
+      (assert (equalp dim (dimension mat2)) ()
 	      "matricies had different dimensions: ~a ~a" mat1 mat2)
       (apply #'*-mat
 	     (make-matrix-from-data
@@ -52,6 +52,8 @@
 	     (cdr mats)))))
 
 ;;; --- common matrices ---
+
+(declaim (ftype (function (number number number) matrix) scale-matrix translation-matrix))
 
 (defun scale-matrix (x y z)
   "return a 4x4 scaling matrix"
@@ -69,6 +71,7 @@
      (0 0 1 ,z)
      (0 0 0  1))))
 
+(declaim (ftype (function (number) matrix) 2d-rotation-matrix))
 (defun 2d-rotation-matrix (angle)
   "returns a 4x4 rotation matrix"
   (make-matrix-from-data
