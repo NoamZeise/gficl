@@ -23,6 +23,11 @@
 
 (defparameter *colour-blank* (make-colour 0 0 0 0))
 
+(defmethod print-object ((obj colour) out)
+  (print-unreadable-object
+   (obj out :type t)
+   (format out "~a, ~a, ~a, ~a" (r obj) (g obj) (b obj) (a obj))))
+
 (deftype shader-type () '(member :vertex-shader :fragment-shader))
 
 (defclass gl-object ()
@@ -33,3 +38,8 @@
 
 (defmethod delete-gl ((obj gl-object))
   (error "This object has not implemented the delete method"))
+
+(defmethod print-object ((obj gl-object) out)
+  (print-unreadable-object
+   (obj out :type t)
+   (format out "id: ~a" (id obj))))

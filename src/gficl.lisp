@@ -3,11 +3,15 @@
 (defparameter *state* nil
   "store internal state of render")
 
-
 (defun closed-p ()
   "check if the window is to be closed"
   (glfw:window-should-close-p))
 
+(defun window-width ()
+  (win-width *state*))
+
+(defun window-height ()
+  (win-height *state*))
 
 (defmacro with-update ((frame-time-var) &body body)
   "poll input and window events, frame time var
@@ -21,7 +25,6 @@ gives the seconds since last update"
 (defmacro with-render (&body body)
   "swaps the backbuffer at end, clears colour-buffer at start."
   `(progn
-     (gl:clear :color-buffer)
      ,@body
      (glfw:swap-buffers)))
 
@@ -51,7 +54,7 @@ gives the seconds since last update"
      ,(macro-check-type height integer env)
      ,(macro-check-type clear-colour colour env)
      ,(macro-check-type cursor cursor-state env)
-     (setf *state* (make-instance 'render-state))
+     (setf *state* (make-instance 'render-state :width ,width :height ,height))
      ;; keys found in glfw:create-window
      (glfw:with-init-window
       (:title ,title :width ,width :height ,height :visible ,visible
@@ -61,14 +64,16 @@ gives the seconds since last update"
       (glfw:set-input-mode :cursor ,cursor)
       (pass-colour gl:clear-color ,clear-colour)
       (glfw:swap-interval (if ,vsync 1 0))
-      (gl:viewport 0 0 ,width ,height)
       ,@body)))
+
 
 ;;; --- Helpers ---
 
 
 (defclass render-state ()
-  ((frame-time :initform (get-internal-real-time) :accessor frame-time :type integer)
+  ((width :initarg :width :accessor win-width :type integer)
+   (height :initarg :height :accessor win-height :type integer)
+   (frame-time :initform (get-internal-real-time) :accessor frame-time :type integer)
    (prev-frame-time :initform (get-internal-real-time) :accessor prev-frame-time :type integer))
   (:documentation "stores interal state of the renderer"))
 
@@ -99,4 +104,5 @@ gives the seconds since last update"
 
 (glfw:def-window-size-callback resize-callback (window w h)
   (declare (ignore window))
-  (gl:viewport 0 0 w h))
+  (setf (win-width *state*) w)
+  (setf (win-height *state*) h))

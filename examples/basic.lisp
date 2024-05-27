@@ -5,7 +5,6 @@
 (defparameter *shader* nil)
 (defparameter *quad* nil)
 (defparameter *fb* nil)
-(defparameter *rb* nil)
 
 ;; shader input
 (defparameter *vertex-format*
@@ -52,6 +51,9 @@ void main() {
 (defparameter *model* nil)
 (defparameter *rot* nil)
 
+
+(defparameter *samples* 1)
+
 (defun setup ()
   (setf *tex*
 	(gficl::make-texture-with-fn 10 10
@@ -61,12 +63,13 @@ void main() {
   
   (setf *shader* (gficl:make-shader *vert-shader* *frag-shader*))
 
+  (setf *samples* (gl:get-integer :max-samples))
+  (if (> *samples* 0) (gl:enable :multisample))
+  (gl:enable :depth-test)
   (setf *fb* (gficl::make-framebuffer
-	      '((:color-attachment0 :texture)
+	      '((:color-attachment0 :renderbuffer)
 		(:depth-stencil-attachment :renderbuffer))
-	      100 100 1))
-
-  (setf *rb* (gficl::make-renderbuffer :rgb 100 100 1))
+	      100 100 *samples*))
 
   (setf *quad* (gficl::make-vertex-data
 		*vertex-format*
@@ -86,7 +89,6 @@ void main() {
   (gficl:delete-gl *tex*)
   (gficl:delete-gl *shader*)
   (gficl:delete-gl *fb*)
-  (gficl:delete-gl *rb*)
   (gficl:delete-gl *quad*))
 
 
@@ -101,15 +103,28 @@ void main() {
 
 (defun render ()
   (gficl:with-render
+   
    (gl:bind-framebuffer :framebuffer (gficl::id *fb*))
-   (gl:bind-framebuffer :framebuffer 0)
+   ;(gl:bind-framebuffer :framebuffer 0)
+   (gl:viewport 0 0 (gficl::window-width) (gficl::window-height))
+   (gl:clear :color-buffer :depth-buffer)
+   
    (gl:use-program (gficl::id *shader*))
    (gficl:set-shader-matrix *shader* "view" *view*)
    (gficl:set-shader-matrix *shader* "projection" *projection*)
    (gficl:set-shader-matrix *shader* "model" *model*)
    (gl:active-texture :texture0)
    (gficl::bind-texture *tex*)   
-   (gficl:draw-vertex-data *quad*)))
+   (gficl:draw-vertex-data *quad*)
+
+   (gl:bind-framebuffer :draw-framebuffer 0)
+   (gl:bind-framebuffer :read-framebuffer (gficl::id *fb*))
+   (gl:draw-buffer :back)
+   (%gl:blit-framebuffer
+    0 0 (gficl::window-width) (gficl::window-height)
+    0 0 (gficl::window-width) (gficl::window-height)
+    :color-buffer-bit :linear)
+   ))
 
 (defun update ()
   (gficl:with-update (dt)

@@ -1,34 +1,40 @@
 (in-package :gficl)
 
+(deftype attachment-position ()
+  '(member  :color-attachment0 :depth-stencil-attachment))
+
+(deftype attachment-resource () '(member :texture :renderbuffer))
+
 (defclass framebuffer (gl-object)
   ((attachments :initarg :attachments :accessor attachments)))
 
+(declaim (ftype (function (list integer integer integer) (values framebuffer &optional))
+		make-framebuffer))
 (defun make-framebuffer (attachments width height samples)
-  (declare (integer width) (integer height) (integer samples))
   (let ((id (gl:gen-framebuffer))
 	(internal-attachments ())
-	(draw-buffers ()))
+	(draw-buffers (list)))
     (gl:bind-framebuffer :framebuffer id)
     (setq internal-attachments
 	  (loop for (pos type) in attachments
 		collecting
 		(let ((res (make-attachment pos type width height samples)))
 		  (ecase type
-		    (:texture
-		     (progn
-		       (gl:framebuffer-texture-2d :framebuffer pos
-						  (tex-type (resource res))
-						  (id (resource res)) 0)
-		       (nconc draw-buffers (cons pos nil))))
-		    (:renderbuffer
-		     (gl:framebuffer-renderbuffer :framebuffer pos :renderbuffer
-						  (id (resource res)))))
+			 (:texture
+			  (progn
+			    (gl:framebuffer-texture-2d :framebuffer pos
+						       (tex-type (resource res))
+						       (id (resource res)) 0)			    
+			    (push pos draw-buffers)))
+			 (:renderbuffer
+			  (progn 
+			    (gl:framebuffer-renderbuffer :framebuffer pos :renderbuffer
+							 (id (resource res))))))
 		  res)))
     (if draw-buffers (gl:draw-buffers draw-buffers))
     (let ((status (gl:check-framebuffer-status :framebuffer)))
       (unless (gl::enum= status :framebuffer-complete)
 	(error "Failed to create framebuffer, gl error: ~A" status)))
-    (gl:bind-framebuffer :framebuffer 0)
     (make-instance 'framebuffer :attachments internal-attachments :id id)))
 
 (defmethod delete-gl ((obj framebuffer))
@@ -46,10 +52,7 @@
 	(id (resource (car attach)))
  	(error "Tried to get the attachment id of a non texture attachment"))))
 
-(deftype attachment-position ()
-  '(member  :color-attachment0 :depth-stencil-attachment))
-
-(deftype attachment-resource () '(member :texture :renderbuffer))
+;; --- Helpers ---
 
 (defclass attachment ()
   ((attach-pos :initarg :position :accessor attach-pos :type attachment-position)
@@ -74,3 +77,11 @@
 
 (defmethod delete-gl ((obj attachment))
   (delete-gl (resource obj)))
+
+(defmethod print-object ((obj attachment) out)
+	   (print-unreadable-object
+	    (obj out :type t)
+	    (format out "~a ~a ~a"
+		    (attach-pos obj)
+		    (res-type obj)
+		    (resource obj))))
