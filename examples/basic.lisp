@@ -51,7 +51,6 @@ void main() {
 (defparameter *model* nil)
 (defparameter *rot* nil)
 
-
 (defparameter *samples* 1)
 
 (defun setup ()
@@ -92,12 +91,13 @@ void main() {
 (defun cleanup ()
   (gficl:delete-gl *tex*)
   (gficl:delete-gl *shader*)
-  (gficl:delete-gl *fb*)
+  (if *fb* (gficl:delete-gl *fb*))
   (gficl:delete-gl *quad*))
 
 (defun run ()
-  (gficl:with-window (:title "basic" :width 1000 :height 1000 :resize-callback #'resize)
-    (setup)
+  (gficl:with-window
+   (:title "basic" :width 1000 :height 1000 :resize-callback #'resize)
+   (setup)
     (loop until (gficl:closed-p)
 	  do (update)
 	  do (render))
@@ -118,17 +118,18 @@ void main() {
    (gl:active-texture :texture0)
    (gficl::bind-texture *tex*)   
    (gficl:draw-vertex-data *quad*)
-   (gficl:set-shader-matrix *shader* "model" (gficl:make-matrix 4))
+   (gficl:set-shader-matrix *shader* "model"
+     (gficl:*-mat
+      (gficl:translation-matrix 200 200 -0.1)
+      (gficl:scale-matrix 500 500 1)))
    (gficl:draw-vertex-data *quad*)
 
    (gl:bind-framebuffer :draw-framebuffer 0)
    (gl:bind-framebuffer :read-framebuffer (gficl::id *fb*))
-;;   (gl:draw-buffer :back)
    (%gl:blit-framebuffer
     0 0 (gficl::window-width) (gficl::window-height)
     0 0 (gficl::window-width) (gficl::window-height)
-    :color-buffer-bit :nearest)
-   ))
+    :color-buffer-bit :nearest)))
 
 (defun update ()
   (gficl:with-update (dt)

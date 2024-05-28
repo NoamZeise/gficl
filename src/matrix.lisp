@@ -97,10 +97,10 @@
 
 (declaim (ftype (function (number number) matrix) screen-ortho-matrix))
 (defun screen-ortho-matrix (width height)
-  "return an orthogonal projection matrix with depth 0 to 1"
-  (assert (and (> width 0) (> height 0)) (width height)
+  "return an orthogonal projection matrix with depth -1 to 1"
+  (assert (and (> width 0) (> height 0)) ()
 	  "ortho width and height must be positive: ~ax~a" width height)
-  (ortho-matrix 0 height 0 width 0 -1))
+  (ortho-matrix 0 height 0 width -1 1))
 
 ;;; --- set shader matricies ---
 
