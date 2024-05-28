@@ -91,10 +91,12 @@ If samples > 1, a multisample texture will be created which does not use the dat
 			(setf (cffi:mem-aref
 			       data :uchar (+ (* y width channels) (* x channels) channel))
 			      value)))))
+    (create-gl)
     (gficl::make-texture width height :data data :format (get-image-format channels))))
 
 (defmethod delete-gl ((obj texture))
-   (gl:delete-texture (id obj)))
+   (gl:delete-texture (id obj))
+   (call-next-method))
 
 (defmethod bind-gl ((obj texture))
   (gl:bind-texture (tex-type obj) (id obj)))
@@ -121,10 +123,12 @@ If samples > 1, a multisample texture will be created which does not use the dat
     (if (> samples 1)
 	(gl:renderbuffer-storage-multisample :renderbuffer samples format width height)
         (gl:renderbuffer-storage :renderbuffer format width height))
+    (create-gl)
     (make-instance 'renderbuffer :id id :samples samples)))
 
 (defmethod delete-gl ((obj renderbuffer))
-  (gl:delete-renderbuffers (list (id obj))))
+  (gl:delete-renderbuffers (list (id obj)))
+  (call-next-method))
 
 (defmethod bind-gl ((obj renderbuffer))
   (gl:bind-renderbuffer :renderbuffer (id obj)))

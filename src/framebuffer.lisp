@@ -45,14 +45,16 @@
     (let ((status (gl:check-framebuffer-status :framebuffer)))
       (unless (gl::enum= status :framebuffer-complete)
 	(error "Failed to create framebuffer, gl error: ~a" status)))
+    (create-gl)
     (make-instance 'framebuffer :attachments internal-attachments :id id)))
 
 (defmethod delete-gl ((obj framebuffer))
   (loop for a in (attachments obj) do (delete-gl a))
-  (gl:delete-framebuffers (list (id obj))))
+  (gl:delete-framebuffers (list (id obj)))
+  (call-next-method))
 
 (defmethod bind-gl ((obj framebuffer))
-  (gl:bind-framebuffer :framebuffer (id framebuffer)))
+  (gl:bind-framebuffer :framebuffer (id obj)))
 
 (declaim (ftype (function (framebuffer integer) (values integer &optional)) framebuffer-attach-id))
 (defun framebuffer-texture-id (framebuffer index)
@@ -69,15 +71,15 @@
 			     (:buffer buffer-mask) (:filter texture-filter)))))
 (defun blit-framebuffers (read-fb draw-fb width height &key
 				  (buffer :color-buffer-bit) (filter :nearest))
-  "blit framebuffers with same width and height, pass nil for backbuffer"
-  (let ((read (if (not read-fb) 0
-		(progn (id read-fb)
-		       (assert (typep read-fb 'framebuffer) ()
-			       "read-fb must be a framebuffer or nil"))))
-	(draw (if (not draw-fb) 0
-		(progn (id draw-fb)
-		       (assert (typep draw-fb 'framebuffer) ()
-			       "draw-fb must be a framebuffer or nil")))))
+  "blit framebuffers with same width and height, pass 0 or nil for backbuffer"
+  (let ((read (if (or (equalp read-fb 0) (not read-fb)) 0
+		(progn (assert (typep read-fb 'framebuffer) ()
+			       "read-fb must be a framebuffer or nil")
+		       (id read-fb))))
+	(draw (if (or (equalp draw-fb 0) (not draw-fb)) 0
+		(progn (assert (typep draw-fb 'framebuffer) ()
+			       "draw-fb must be a framebuffer or nil")
+		       (id draw-fb)))))
     (gl:bind-framebuffer :draw-framebuffer draw)
     (gl:bind-framebuffer :read-framebuffer read)
     (%gl:blit-framebuffer 0 0 width height
@@ -110,7 +112,7 @@
 		(:texture
 		 (make-texture width height :format format :samples samples :wrap :clamp-to-border))
 		(:renderbuffer
-		 (make-renderbuffer format width height samples)))))    
+		 (make-renderbuffer format width height samples)))))
     (make-instance 'attachment :position position :res res :res-type resource-type)))
 
 (declaim (ftype (function (attachment)) attach-to-framebuffer))

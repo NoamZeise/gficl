@@ -1,13 +1,9 @@
 (in-package :gficl)
 
-;;; ----- vertex type spec -----
+;;; --- vertex shader input form ---
 
 (deftype vertex-elem-type ()
-	 '(member
-	   :float :double
-	   :int :unsigned-int
-	   :char :unsigned-char
-	   :short :unsigned-short))
+	 '(member :float :double :int :unsigned-int :char :unsigned-char :short :unsigned-short))
 
 (defclass vertex-slot ()
   ((vector-size :initarg :vector-size :accessor vector-size :type integer)
@@ -39,24 +35,22 @@ The order must match the vertex locations in the shader"
 		   :slot-offsets (nreverse slot-offsets)
 		   :vertex-mem-size vertex-mem-size)))
 
-(defparameter *3d-vertex*
-  (make-vertex-form
-   (list
-    (make-vertex-slot 3 :float)	   ; position
-    (make-vertex-slot 2 :float)))) ; tex coords
+;;; --- vertex data ---
 
-;;; ----- OpenGL vertex arrays -----
-
-(defclass vertex-data ()
-  ((vao :initarg :vao :accessor vao)
-   (vbo :initarg :vbo :accessor vbo)
+(defclass vertex-data (gl-object)
+  ;; gl-object id store vertex array object
+  ((vbo :initarg :vbo :accessor vbo)
    (ebo :initarg :ebo :accessor ebo)
    (index-count :initarg :index-count :accessor index-count)
    (draw-mode :initform :triangles :accessor draw-mode)))
 
 (defmethod delete-gl ((obj vertex-data))
   (gl:delete-buffers (list (vbo obj) (ebo obj)))
-  (gl:delete-vertex-arrays (list (vao obj))))
+  (gl:delete-vertex-arrays (list (id obj)))
+  (call-next-method))
+
+(defmethod bind-gl ((obj vertex-data))
+  (gl:bind-vertex-array (id obj)))
 
 (declaim (ftype (function (vertex-form list list) (values vertex-data &optional)) make-vertex-data))
 (defun make-vertex-data (vertex-form vertices indices)
@@ -78,7 +72,8 @@ The order must match the vertex locations in the shader"
     (setup-vertex-attrib-array vertex-form)
     (cffi:foreign-free vertex-data)
     (gl:free-gl-array index-data)
-    (make-instance 'vertex-data :vao vao :vbo vbo :ebo ebo :index-count (length indices))))
+    (create-gl)
+    (make-instance 'vertex-data :id vao :vbo vbo :ebo ebo :index-count (length indices))))
 
 (declaim (ftype (function (vertex-data &key (vertices number)))))
 (defun draw-vertex-data (vertex-data &key (vertices 0 vertp) (instances 1))
@@ -87,7 +82,7 @@ The order must match the vertex locations in the shader"
 	  (vertices instances)
 	  "draw vertex data args were out of range. vertices: (~d) instances: (~d)"
 	  vertices instances)
-  (gl:bind-vertex-array (vao vertex-data))
+  (bind-gl vertex-data)
   (if (> instances 1)
       (%gl:draw-elements-instanced (draw-mode vertex-data) vertices :unsigned-int 0 instances)
     (%gl:draw-elements (draw-mode vertex-data) vertices :unsigned-int 0)))

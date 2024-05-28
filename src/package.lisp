@@ -25,7 +25,6 @@
    #:make-texture
    #:make-texture-with-fn
    #:get-image-format
-   #:bind-texture
 
    ;; framebuffer
    #:make-attachment-description

@@ -1,7 +1,6 @@
 (in-package :gficl)
 
-(defclass shader (gl-object)
-  ())
+(defclass shader (gl-object) ())
 
 (declaim (ftype (function (pathname pathname) shader) make-shader-from-path))
 (defun make-shader-from-path (vertex-path fragment-path)
@@ -30,10 +29,12 @@ for the vertex and fragment shader."
     (gl:detach-shader program frag)
     (gl:delete-shader vert)
     (gl:delete-shader frag)
+    (create-gl)
     (let ((shader (make-instance 'shader :id program))) shader)))
 
 (defmethod delete-gl ((obj shader))
-  (gl:delete-program (id obj)))
+  (gl:delete-program (id obj))
+  (call-next-method))
 
 (defmethod bind-gl ((obj shader))
   (gl:use-program (id obj)))

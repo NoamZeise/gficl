@@ -58,6 +58,7 @@
 				  :width ,width
 				  :height ,height
 				  :resize-fn ,resize-callback))
+     (setf *active-objects* 0)
      ;; keys found in glfw:create-window
      (glfw:with-init-window
       (:title ,title :width ,width :height ,height :visible ,visible
@@ -66,7 +67,10 @@
       (register-glfw-callbacks)
       (glfw:set-input-mode :cursor ,cursor)
       (glfw:swap-interval (if ,vsync 1 0))
-      ,@body)))
+      ,@body
+      (if (not (= 0 *active-objects*))
+	  (format t "~%Warning: ~a gl object~:p ~:*~[ ~;was~:;were~] not freed~%"
+		  *active-objects*)))))
 
 ;;; --- Helpers ---
 

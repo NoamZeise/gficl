@@ -1,5 +1,8 @@
 (in-package :gficl)
 
+(defparameter *active-objects* 0
+  "track undelete opengl resources")
+
 (deftype cursor-state () '(member :normal :hidden :disabled))
 
 (deftype shader-type () '(member :vertex-shader :fragment-shader))
@@ -11,11 +14,14 @@
 (defclass gl-object ()
   ((id :initarg :id :initform 0 :accessor id :type integer)))
 
+(defun create-gl ()
+  (setf *active-objects* (+ *active-objects* 1)))
+
 (defgeneric delete-gl (obj)
   (:documentation "delete an OpenGL object"))
 
 (defmethod delete-gl ((obj gl-object))
-  (error "This object has not implemented the delete method"))
+  (setf *active-objects* (- *active-objects* 1)))
 
 (defgeneric bind-gl (obj)
   (:documentation "bind this object to the relevant opengl resource"))
