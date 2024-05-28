@@ -5,12 +5,14 @@
    #:with-window
    #:with-update
    #:with-render
+   #:window-width
+   #:window-height
    #:closed-p
+   
+   ;; gl objects
+   #:id
+   #:bind-gl
    #:delete-gl
-
-   ;; colour
-   #:colour
-   #:make-colour
 
    ;; vertex data description
    #:make-vertex-slot
@@ -19,9 +21,17 @@
    #:make-vertex-data
    #:draw-vertex-data
 
-   ;; image   
+   ;; image
+   #:make-texture
+   #:make-texture-with-fn
+   #:get-image-format
+   #:bind-texture
 
    ;; framebuffer
+   #:make-attachment-description
+   #:make-framebuffer
+   #:blit-framebuffers
+   #:framebuffer-texture-id
 
    ;; shader
    #:make-shader
@@ -29,7 +39,7 @@
    #:shader-loc
 
    ;; matrices
-   #:set-shader-matrix
+   #:bind-matrix
    #:make-matrix
    #:make-matrix-from-data
    #:*-mat

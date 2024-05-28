@@ -109,11 +109,11 @@
      ,@body
      (cffi:foreign-free ,var)))
 
-(defgeneric set-shader-matrix (shader name matrix)
+(defgeneric bind-matrix (shader name matrix)
 	    (:documentation "set shader location with name to value of matrix"))
 
-(declaim (ftype (function (shader string matrix))))
-(defmethod set-shader-matrix (shader name (matrix matrix))
+(declaim (ftype (function (shader string matrix)) bind-matrix))
+(defmethod bind-matrix (shader name (matrix matrix))
   (with-foreign-matrix
    (ptr matrix)
    (let ((location (shader-loc shader name)))

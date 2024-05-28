@@ -15,8 +15,7 @@
 
 (declaim (ftype (function (integer vertex-elem-type) vertex-slot) make-vertex-slot))
 (defun make-vertex-slot (vector-size element-type)
-  "define an element of a vertex in a shader. 
-ie position, normal, texcoords, etc."
+  "define an element of a vertex in a shader. ie position, normal, texcoords, etc."
   (make-instance 'vertex-slot :vector-size vector-size :element-type element-type))
 
 (defclass vertex-form ()

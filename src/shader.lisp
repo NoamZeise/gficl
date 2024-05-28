@@ -35,6 +35,9 @@ for the vertex and fragment shader."
 (defmethod delete-gl ((obj shader))
   (gl:delete-program (id obj)))
 
+(defmethod bind-gl ((obj shader))
+  (gl:use-program (id obj)))
+
 (declaim (ftype (function (shader string) unsigned-byte) shader-loc))
 (defun shader-loc (shader name)
   "Get location of the uniform with name in the shader"

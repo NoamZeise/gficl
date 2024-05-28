@@ -12,10 +12,6 @@
     (list (gficl:make-vertex-slot 3 :float)
 	  (gficl:make-vertex-slot 2 :float))))
 
-;; shader data
-(defparameter *view* nil)
-(defparameter *projection* nil)
-
 ;; shaders
 (defparameter *vert-shader*
 	      "#version 330
@@ -44,8 +40,11 @@ uniform sampler2D tex;
 
 void main() {
      colour = texture(tex, TexCoords);
-}
-")
+}")
+
+;; shader data
+(defparameter *view* nil)
+(defparameter *projection* nil)
 
 ;; object data
 (defparameter *model* nil)
@@ -54,38 +53,36 @@ void main() {
 (defparameter *samples* 1)
 
 (defun setup ()
-  (setf *tex* (gficl::make-texture-with-fn
-	       10 10
-	       #'(lambda (x y)
-		   (list (floor (* 255 (/ x 10)))
-			 (floor (* 255 (/ y 10))) 255 255))))
-  
   (setf *shader* (gficl:make-shader *vert-shader* *frag-shader*))
-
-  (setf *samples* (gl:get-integer :max-samples))
-  (if (> *samples* 1) (gl:enable :multisample))
+  (gl:clear-color 0 0 0 0)
+  (setf *samples* (min 16 (gl:get-integer :max-samples)))
+  (if (> *samples* 1) (gl:enable :multisample))  
   (setf *fb* nil)
-  (resize (gficl::window-width) (gficl::window-height))
+  (resize (gficl:window-width) (gficl:window-height))
   (gl:enable :depth-test)
-  (setf *quad* (gficl::make-vertex-data
+  (setf *quad* (gficl:make-vertex-data
 		*vertex-format*
 		'(((0 0 0) (0 0))
 		  ((1 0 0) (1 0))
 		  ((1 1 0) (1 1))
 		  ((0 1 0) (0 1)))
 		'(0 3 2 2 1 0)))
+  (setf *tex* (gficl:make-texture-with-fn
+	       10 10 #'(lambda (x y) (list (floor (* 255 (/ x 10)))
+					   (floor (* 255 (/ y 10)))
+					   255 255))))
   
-  (setf *view* (gficl::make-matrix 4))
-  (setf *projection* (gficl::make-matrix 4))
+  (setf *view* (gficl:make-matrix 4))
+  (setf *projection* (gficl:make-matrix 4))
 
-  (setf *model* (gficl::make-matrix 4))
+  (setf *model* (gficl:make-matrix 4))
   (setf *rot* 0))
 
 (defun resize (w h)
-  (if *fb* (gficl::delete-gl *fb*))
-  (setf *fb* (gficl::make-framebuffer
-	      '((:color-attachment0 :renderbuffer)
-		(:depth-stencil-attachment :renderbuffer))
+  (if *fb* (gficl:delete-gl *fb*))
+  (setf *fb* (gficl:make-framebuffer
+	      (list (gficl:make-attachment-description :color-attachment0)
+		    (gficl:make-attachment-description :depth-stencil-attachment))
 	      w h *samples*)))
 
 (defun cleanup ()
@@ -106,30 +103,24 @@ void main() {
 (defun render ()
   (gficl:with-render
    
-   (gl:bind-framebuffer :framebuffer (gficl::id *fb*))
-   ;(gl:bind-framebuffer :framebuffer 0)
+   (gficl:bind-gl *fb*)
    (gl:viewport 0 0 (gficl::window-width) (gficl::window-height))
    (gl:clear :color-buffer :depth-buffer)
    
-   (gl:use-program (gficl::id *shader*))
-   (gficl:set-shader-matrix *shader* "view" *view*)
-   (gficl:set-shader-matrix *shader* "projection" *projection*)
-   (gficl:set-shader-matrix *shader* "model" *model*)
+   (gficl:bind-gl *shader*)
+   (gficl:bind-matrix *shader* "view" *view*)
+   (gficl:bind-matrix *shader* "projection" *projection*)
+   (gficl:bind-matrix *shader* "model" *model*)
    (gl:active-texture :texture0)
-   (gficl::bind-texture *tex*)   
+   (gficl:bind-gl *tex*)
    (gficl:draw-vertex-data *quad*)
-   (gficl:set-shader-matrix *shader* "model"
+   (gficl:bind-matrix *shader* "model"
      (gficl:*-mat
-      (gficl:translation-matrix 200 200 -0.1)
+      (gficl:translation-matrix 200 200 0.1)
       (gficl:scale-matrix 500 500 1)))
    (gficl:draw-vertex-data *quad*)
 
-   (gl:bind-framebuffer :draw-framebuffer 0)
-   (gl:bind-framebuffer :read-framebuffer (gficl::id *fb*))
-   (%gl:blit-framebuffer
-    0 0 (gficl::window-width) (gficl::window-height)
-    0 0 (gficl::window-width) (gficl::window-height)
-    :color-buffer-bit :nearest)))
+   (gficl:blit-framebuffers *fb* 0 (gficl:window-width) (gficl:window-height))))
 
 (defun update ()
   (gficl:with-update (dt)
