@@ -46,7 +46,8 @@ gives the seconds since last update"
       (cursor :normal) ;; normal, hidden, disabled
       (vsync t)
       (opengl-version-major 3)
-      (opengl-version-minor 3))
+      (opengl-version-minor 3)
+      (resize-callback (lambda (w h) (declare (ignore w h)))))
      &body body &environment env)
   `(progn
      ,(macro-check-type title string env)
@@ -54,7 +55,10 @@ gives the seconds since last update"
      ,(macro-check-type height integer env)
      ,(macro-check-type clear-colour colour env)
      ,(macro-check-type cursor cursor-state env)
-     (setf *state* (make-instance 'render-state :width ,width :height ,height))
+     (setf *state* (make-instance 'render-state
+				  :width ,width
+				  :height ,height
+				  :resize-fn ,resize-callback))
      ;; keys found in glfw:create-window
      (glfw:with-init-window
       (:title ,title :width ,width :height ,height :visible ,visible
@@ -73,6 +77,7 @@ gives the seconds since last update"
 (defclass render-state ()
   ((width :initarg :width :accessor win-width :type integer)
    (height :initarg :height :accessor win-height :type integer)
+   (resize-fn :initarg :resize-fn :accessor resize-fn :type (function (integer integer)))
    (frame-time :initform (get-internal-real-time) :accessor frame-time :type integer)
    (prev-frame-time :initform (get-internal-real-time) :accessor prev-frame-time :type integer))
   (:documentation "stores interal state of the renderer"))
@@ -105,4 +110,5 @@ gives the seconds since last update"
 (glfw:def-window-size-callback resize-callback (window w h)
   (declare (ignore window))
   (setf (win-width *state*) w)
-  (setf (win-height *state*) h))
+  (setf (win-height *state*) h)
+  (funcall (resize-fn *state*) w h))

@@ -21,13 +21,14 @@
 		(let ((res (make-attachment pos type width height samples)))
 		  (ecase type
 			 (:texture
-			  (progn
-			    (gl:framebuffer-texture-2d :framebuffer pos
-						       (tex-type (resource res))
-						       (id (resource res)) 0)			    
+			  (let ((id (id (resource res)))
+				(tex-type (tex-type (resource res))))
+			    (gl:bind-texture tex-type id)
+			    (gl:framebuffer-texture-2d :framebuffer pos tex-type id 0)
 			    (push pos draw-buffers)))
 			 (:renderbuffer
-			  (progn 
+			  (progn
+			    (gl:bind-renderbuffer :renderbuffer (id (resource res)))
 			    (gl:framebuffer-renderbuffer :framebuffer pos :renderbuffer
 							 (id (resource res))))))
 		  res)))
@@ -41,7 +42,7 @@
   (loop for a in (attachments obj) do (delete-gl a))
   (gl:delete-framebuffers (list (id obj))))
 
-(declaim (ftype (function (framebuffer integer) integer) framebuffer-attach-id))
+(declaim (ftype (function (framebuffer integer) (values integer &optional)) framebuffer-attach-id))
 (defun framebuffer-attach-id (framebuffer index)
   (let ((attach (attachments framebuffer)))
     (dotimes (i index)
@@ -52,6 +53,12 @@
 	(id (resource (car attach)))
  	(error "Tried to get the attachment id of a non texture attachment"))))
 
+(defmethod print-object ((obj framebuffer) out)
+  (print-unreadable-object
+   (obj out :type t)
+   (format out "~{~%  ~a~}"
+	   (attachments obj))))
+
 ;; --- Helpers ---
 
 (defclass attachment ()
@@ -60,7 +67,7 @@
    (resource :initarg :res :accessor resource)))
 
 (declaim (ftype (function (attachment-position attachment-resource integer integer integer)
-			  attachment)
+			  (values attachment &optional))
 		make-attachment))
 (defun make-attachment (position resource-type width height samples)
   "Create attachment resource. Either a texture or a renderbuffer."
@@ -72,16 +79,15 @@
 		(:texture
 		 (make-texture width height :format format :samples samples :wrap :clamp-to-border))
 		(:renderbuffer
-		 (make-renderbuffer format width height samples)))))
+		 (make-renderbuffer format width height samples)))))    
     (make-instance 'attachment :position position :res res :res-type resource-type)))
 
 (defmethod delete-gl ((obj attachment))
   (delete-gl (resource obj)))
 
 (defmethod print-object ((obj attachment) out)
-	   (print-unreadable-object
-	    (obj out :type t)
-	    (format out "~a ~a ~a"
-		    (attach-pos obj)
-		    (res-type obj)
-		    (resource obj))))
+  (print-unreadable-object
+   (obj out :type t)
+   (format out "~a ~a"
+	   (attach-pos obj)
+	   (resource obj))))

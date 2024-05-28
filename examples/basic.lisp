@@ -55,22 +55,19 @@ void main() {
 (defparameter *samples* 1)
 
 (defun setup ()
-  (setf *tex*
-	(gficl::make-texture-with-fn 10 10
-	   #'(lambda (x y)
-	       (list (floor (* 255 (/ x 10)))
-		     (floor (* 255 (/ y 10))) 255 255))))
+  (setf *tex* (gficl::make-texture-with-fn
+	       10 10
+	       #'(lambda (x y)
+		   (list (floor (* 255 (/ x 10)))
+			 (floor (* 255 (/ y 10))) 255 255))))
   
   (setf *shader* (gficl:make-shader *vert-shader* *frag-shader*))
 
   (setf *samples* (gl:get-integer :max-samples))
-  (if (> *samples* 0) (gl:enable :multisample))
+  (if (> *samples* 1) (gl:enable :multisample))
+  (setf *fb* nil)
+  (resize (gficl::window-width) (gficl::window-height))
   (gl:enable :depth-test)
-  (setf *fb* (gficl::make-framebuffer
-	      '((:color-attachment0 :renderbuffer)
-		(:depth-stencil-attachment :renderbuffer))
-	      100 100 *samples*))
-
   (setf *quad* (gficl::make-vertex-data
 		*vertex-format*
 		'(((0 0 0) (0 0))
@@ -78,12 +75,19 @@ void main() {
 		  ((1 1 0) (1 1))
 		  ((0 1 0) (0 1)))
 		'(0 3 2 2 1 0)))
-
+  
   (setf *view* (gficl::make-matrix 4))
   (setf *projection* (gficl::make-matrix 4))
 
   (setf *model* (gficl::make-matrix 4))
   (setf *rot* 0))
+
+(defun resize (w h)
+  (if *fb* (gficl::delete-gl *fb*))
+  (setf *fb* (gficl::make-framebuffer
+	      '((:color-attachment0 :renderbuffer)
+		(:depth-stencil-attachment :renderbuffer))
+	      w h *samples*)))
 
 (defun cleanup ()
   (gficl:delete-gl *tex*)
@@ -91,15 +95,13 @@ void main() {
   (gficl:delete-gl *fb*)
   (gficl:delete-gl *quad*))
 
-
 (defun run ()
-  (gficl:with-window (:title "basic" :width 1000 :height 1000)
+  (gficl:with-window (:title "basic" :width 1000 :height 1000 :resize-callback #'resize)
     (setup)
     (loop until (gficl:closed-p)
 	  do (update)
 	  do (render))
     (cleanup)))
-
 
 (defun render ()
   (gficl:with-render
@@ -116,14 +118,16 @@ void main() {
    (gl:active-texture :texture0)
    (gficl::bind-texture *tex*)   
    (gficl:draw-vertex-data *quad*)
+   (gficl:set-shader-matrix *shader* "model" (gficl:make-matrix 4))
+   (gficl:draw-vertex-data *quad*)
 
    (gl:bind-framebuffer :draw-framebuffer 0)
    (gl:bind-framebuffer :read-framebuffer (gficl::id *fb*))
-   (gl:draw-buffer :back)
+;;   (gl:draw-buffer :back)
    (%gl:blit-framebuffer
     0 0 (gficl::window-width) (gficl::window-height)
     0 0 (gficl::window-width) (gficl::window-height)
-    :color-buffer-bit :linear)
+    :color-buffer-bit :nearest)
    ))
 
 (defun update ()

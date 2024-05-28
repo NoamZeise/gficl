@@ -1,19 +1,20 @@
 (in-package :gficl)
 
-
 (deftype image-format () '(member :red :rg :rgb :rgba :depth24-stencil8))
-
 
 ;;; ----------  Texture -------------
 
-(defclass texture (gl-object)
-  ((tex-type :initarg :tex-type :accessor tex-type :type texture-type)))
-
 (deftype texture-type ()
   '(memeber :texture-2d :texture-2d-multisample))
+
 (deftype texture-wrap ()
   '(member :clamp-to-edge :clamp-to-border :mirrored-repeat :repeat :mirrored-clamp-to-edge))
+
 (deftype texture-filter () '(member :nearest :linear))
+
+(defclass texture (gl-object)
+  ((tex-type :initarg :tex-type :accessor tex-type :type texture-type)
+   (samples :initarg :samples :accessor tex-samples)))
 
 (defun make-texture
     (width height &key
@@ -43,7 +44,7 @@ Data is a pointer to unsigned bytes or unsigned byte array, one byte for each ch
 	       (gl:tex-parameter type :texture-min-filter filter)
 	       (gl:tex-parameter type :texture-mag-filter filter)))
     (gl:bind-texture type 0)
-    (make-instance 'texture :id id :tex-type type)))
+    (make-instance 'texture :id id :tex-type type :samples samples)))
 
 (declaim (ftype (function (integer
 			   integer
@@ -75,10 +76,16 @@ Data is a pointer to unsigned bytes or unsigned byte array, one byte for each ch
 (defun bind-texture (tex)
   (gl:bind-texture (tex-type tex) (id tex)))
 
+(defmethod print-object ((obj texture) out)
+   (print-unreadable-object
+    (obj out :type t)
+    (format out "samples: ~a, id: ~a"
+	    (tex-samples obj) (id obj))))
 
 ;;; --------- Renderbuffer -----------
 
-(defclass renderbuffer (gl-object) ())
+(defclass renderbuffer (gl-object)
+  ((samples :initarg :samples :accessor rb-samples)))
 
 (declaim (ftype (function (image-format integer integer integer)
 			  (values renderbuffer &optional))
@@ -90,9 +97,14 @@ Data is a pointer to unsigned bytes or unsigned byte array, one byte for each ch
     (gl:bind-renderbuffer :renderbuffer id)
     (if (> samples 1)
 	(gl:renderbuffer-storage-multisample :renderbuffer samples format width height)
-	(gl:renderbuffer-storage :renderbuffer format width height))
-    (gl:bind-renderbuffer :renderbuffer 0)
-    (make-instance 'renderbuffer :id id)))
+        (gl:renderbuffer-storage :renderbuffer format width height))
+    (make-instance 'renderbuffer :id id :samples samples)))
 
 (defmethod delete-gl ((obj renderbuffer))
-  (gl:delete-framebuffers (list (id obj))))
+  (gl:delete-renderbuffers (list (id obj))))
+
+(defmethod print-object ((obj renderbuffer) out)
+   (print-unreadable-object
+    (obj out :type t)
+    (format out "samples: ~a, id: ~a"
+	    (rb-samples obj) (id obj))))

@@ -1,5 +1,5 @@
-(require 'asdf)
-(load "gficl.asd")
+;;(require 'asdf)
+;;(load "gficl.asd")
 (in-package :asdf-user)
 (defsystem :gficl-examples
   :defsystem-depends-on (:deploy)
