@@ -8,6 +8,8 @@
    #:window-width
    #:window-height
    #:closed-p
+   #:toggle-fullscreen
+   #:set-fullscreen
    
    ;; gl objects
    #:id

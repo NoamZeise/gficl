@@ -85,8 +85,6 @@ void main() {
 	     (list (floor (* 200 (abs (sin (* x 0.002))))) (floor (* 200 (abs (cos (* y 0.002)))))
 		   200 255))))
   
-  (setf *projection* (gficl:make-matrix 4))
-
   (setf *model* (gficl:make-matrix 4))
   (setf *rot* 0))
 
@@ -94,7 +92,8 @@ void main() {
   (gl:viewport 0 0 w h)
   (if *fb* (gficl:delete-gl *fb*))
   (setf *fb* (gficl:make-framebuffer *fb-attachments* w h *samples*))
-  (setf *bg-model* (gficl:scale-matrix w h 1)))
+  (setf *bg-model* (gficl:scale-matrix w h 1))
+  (setf *projection* (gficl:screen-ortho-matrix (gficl:window-width) (gficl:window-height))))
 
 (defun cleanup ()
   (gficl:delete-gl *tex*)
@@ -129,20 +128,27 @@ void main() {
 
    (gficl:blit-framebuffers *fb* 0 (gficl:window-width) (gficl:window-height))))
 
+(defparameter *pressed-last* nil)
+
 (defun update ()
   (gficl:with-update (dt)
-   (setf *rot* (+ *rot* (* dt 1)))
+    (if (equalp (glfw:get-key :escape) :press)
+	(glfw:set-window-should-close))		     
+    (setf *rot* (+ *rot* (* dt 1)))
    ;(if (> dt 0) (format t "fps: ~a~%" (round (/ 1 dt))))
-   (destructuring-bind (w h) (glfw:get-window-size)
-		       (setf *projection* (gficl:screen-ortho-matrix w h)))
-   (setf *model*
-	 (let* ((w (gficl:window-width))
-		(h (gficl:window-height))
-		(size (* 0.7 (min w h)))
-		(half (/ size 2)))
-	   (gficl:*-mat
-	    (gficl:translation-matrix (- (/ w 2) half) (- (/ h 2) half) 0.1)
-	    (gficl:translation-matrix half half 0)
-	    (gficl:2d-rotation-matrix *rot*)
-	    (gficl:translation-matrix (- half) (- half) 0)
-	    (gficl:scale-matrix size size 1))))))
+    (if (equalp (glfw:get-key :f) :press)
+	(if (not *pressed-last*)
+	    (progn (gficl:toggle-fullscreen)
+		   (setf *pressed-last* t)))
+      (setf *pressed-last* nil)))
+  (setf *model*
+	(let* ((w (gficl:window-width))
+	       (h (gficl:window-height))
+	       (size (* 0.7 (min w h)))
+	       (half (/ size 2)))
+	  (gficl:*-mat
+	   (gficl:translation-matrix (- (/ w 2) half) (- (/ h 2) half) 0.1)
+	   (gficl:translation-matrix half half 0)
+	   (gficl:2d-rotation-matrix *rot*)
+	   (gficl:translation-matrix (- half) (- half) 0)
+	   (gficl:scale-matrix size size 1))))))
