@@ -151,4 +151,4 @@ void main() {
 	   (gficl:translation-matrix half half 0)
 	   (gficl:2d-rotation-matrix *rot*)
 	   (gficl:translation-matrix (- half) (- half) 0)
-	   (gficl:scale-matrix size size 1))))))
+	   (gficl:scale-matrix size size 1)))))
