@@ -1,5 +1,10 @@
 (in-package :gficl)
 
+(defclass mn-matrix ()
+  ((data :initarg :data)
+   (m-dim :initarg :m-dim :accessor m-dim)
+   (n-dim :initarg :n-dim :accessor n-dim)))
+
 (defclass matrix ()
   ((data :initarg :data)
    (dimension :initarg :dimension :accessor dimension))
@@ -51,6 +56,13 @@
 				(* dat (nth i row2))))))
 	     (cdr mats)))))
 
+(defun cross-product (x y z a b c)
+  (list (- (* y c) (* z b))
+	(- (* z a) (* x c))
+	(- (* x b) (* y a))))
+
+(defun dot-product ())
+
 ;;; --- common matrices ---
 
 (declaim (ftype (function (number number number) matrix) scale-matrix translation-matrix))
@@ -101,6 +113,17 @@
   (assert (and (> width 0) (> height 0)) ()
 	  "ortho width and height must be positive: ~ax~a" width height)
   (ortho-matrix 0 height 0 width -1 1))
+
+(defun perspective-matrix ())
+
+(defun view-matrix (forward-x forward-y forward-z world-up-x world-up-y world-up-z)
+  (let* ((left ())
+	 (up ()))
+    (make-matrix-from-data
+     `((1 0 0 0)
+       (0 1 0 0)
+       (0 0 1 0)
+       (,forward-x ,forward-y ,forward-z 1)))))
 
 ;;; --- set shader matricies ---
 

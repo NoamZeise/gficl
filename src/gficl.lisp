@@ -18,12 +18,11 @@
 (defun toggle-fullscreen ()
   (set-fullscreen (not (fullscreen *state*))))
 
-(defmacro with-update ((frame-time-var) &body body)
+(defmacro with-update ((&optional frame-time-var) &body body)
   "poll input and window events. frame-time-var gives the seconds since last update"
-  `(progn
-     (let ((,frame-time-var (update-frame-time)))
-       (glfw:poll-events)
-       ,@body)))
+  (if frame-time-var
+      `(let ((,frame-time-var (update-frame-time))) (glfw:poll-events) ,@body)
+    `(progn (glfw:poll-events) ,@body)))
 
 (defmacro with-render (&body body)
   "enclose gl render calls, swaps the backbuffer at end."
@@ -49,7 +48,7 @@
       (vsync t)
       (opengl-version-major 3)
       (opengl-version-minor 3)
-      (resize-callback (lambda (w h) (declare (ignore w h)))))
+      (resize-callback '(lambda (w h) (declare (ignore w h)))))
      &body body &environment env)
   "Open a glfw window in the body of this function. 
 RESIZE-CALLBACK is only called when width and height are non-zero."

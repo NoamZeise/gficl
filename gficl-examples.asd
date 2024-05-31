@@ -9,4 +9,5 @@
   :components ((:module "examples"
 		:components
 		((:file "package")
-		 (:file "basic")))))
+		 (:file "basic")
+		 (:file "post-processing")))))

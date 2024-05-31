@@ -1,6 +1,5 @@
 (in-package :gficl-examples.basic)
 
-
 (defparameter *samples* 1)
 
 (defparameter *fb-attachments*
@@ -27,8 +26,7 @@ out vec2 TexCoords;
 uniform mat4 model;
 uniform mat4 projection;
 
-void main()
-{
+void main() {
     TexCoords = inTexCoords;
     gl_Position = projection * model * vec4(vertex, 0, 1);
 }")
@@ -41,7 +39,7 @@ out vec4 colour;
 uniform sampler2D tex;
 
 void main() {
-     colour = texture(tex, TexCoords);
+  colour = texture(tex, TexCoords);
 }")
 ;; shader data
 (defparameter *projection* nil)
@@ -60,7 +58,7 @@ void main() {
   (setf *shader* (gficl:make-shader *vert-shader* *frag-shader*))
   (gl:clear-color 0 0 0 0)
   (setf *samples* (min 16 (gl:get-integer :max-samples)))
-  (if (> *samples* 1) (gl:enable :multisample))  
+  (if (> *samples* 1) (gl:enable :multisample))
   (setf *fb* nil)
   
   (resize (gficl:window-width) (gficl:window-height))
