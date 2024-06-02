@@ -55,10 +55,9 @@ void main() {
 		(getf *cube-data* :verts)
 		(getf *cube-data* :indices)))
   (setf *main-shader* (gficl:make-shader *main-vert-code* *main-frag-code*))
-
   
-  (setf *projection* )
-  (setf *model* (gficl:make-matrix 4)))
+  (setf *projection* (gficl:make-matrix))
+  (setf *model* (gficl:make-matrix)))
 
 (defun cleanup ()
   (gficl:delete-gl *cube*)
@@ -84,8 +83,8 @@ void main() {
       (gficl:screen-ortho-matrix (gficl:window-width) (gficl:window-height)))
     (gficl:bind-matrix *main-shader* "model"
       (gficl:*-mat
-       (gficl:translation-matrix 50 50 0)
-       (gficl:scale-matrix 100 100 1)))
+       (gficl:translation-matrix '(50 50 0))
+       (gficl:scale-matrix '(100 100 1))))
     (gficl:draw-vertex-data *cube*)))
 
 (defun run ()

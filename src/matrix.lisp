@@ -1,14 +1,9 @@
 (in-package :gficl)
 
-(defclass mn-matrix ()
-  ((data :initarg :data)
-   (m-dim :initarg :m-dim :accessor m-dim)
-   (n-dim :initarg :n-dim :accessor n-dim)))
-
 (defclass matrix ()
   ((data :initarg :data)
    (dimension :initarg :dimension :accessor dimension))
-  (:documentation "N dimensional matrix"))
+  (:documentation "An nxn dimensional matrix"))
 
 (defmethod print-object ((obj matrix) out)
   (print-unreadable-object
@@ -17,9 +12,13 @@
 	   (dimension obj) (dimension obj)
 	   (slot-value obj 'data))))
 
-(defun make-matrix (dimension &key (element-fn (lambda (i j) (if (equalp i j) 1 0))))
+(declaim (ftype (function (&key (:dimension integer)
+				(:element-fn (function (integer integer) number)))
+			  (values matrix &optional))
+		make-matrix))
+(defun make-matrix (&key (dimension 4) (element-fn (lambda (i j) (if (equalp i j) 1 0))))
   "Create a matrix with a given dimension - default is identity"
-  (assert ( > dimension 0) (dimension) "Dimension must be greater than zero")
+  (assert ( > dimension 0) () "Dimension must be greater than zero")
   (let ((data (loop for i from 1 to dimension collecting
 		    (loop for j from 1 to dimension collecting
 			  (funcall element-fn i j)))))
@@ -56,44 +55,46 @@
 				(* dat (nth i row2))))))
 	     (cdr mats)))))
 
-(defun cross-product (x y z a b c)
-  (list (- (* y c) (* z b))
-	(- (* z a) (* x c))
-	(- (* x b) (* y a))))
-
-(defun dot-product ())
-
 ;;; --- common matrices ---
 
-(declaim (ftype (function (number number number) matrix) scale-matrix translation-matrix))
+(declaim (ftype (function (vec) matrix) scale-matrix translation-matrix))
 
-(defun scale-matrix (x y z)
+(defun create-scale-matrix (vec)
   "return a 4x4 scaling matrix"
+  (assert (<= 3 (dimension vec)) ()  "vec must have at least 3 dimensions")
   (make-matrix-from-data
-   `((,x  0  0 0)
-     ( 0 ,y  0 0)
-     ( 0  0 ,z 0)
+   `((,(vec-ref vec 0)  0  0 0)
+     ( 0 ,(vec-ref vec 1)  0 0)
+     ( 0  0 ,(vec-ref vec 2) 0)
      ( 0  0  0 1))))
 
-(defun translation-matrix (x y z)
+(defmacro scale-matrix (vec)
+  "Return a 4x4 scaling MATRIX using a VEC"
+  `(create-scale-matrix (make-vec-if-list ,vec)))
+
+(defun create-translation-matrix (vec)
   "returns a 4x4 translation matrix"
+  (assert (<= 3 (dimension vec)) ()  "vec must have at least 3 dimensions")
   (make-matrix-from-data
-   `((1 0 0 ,x)
-     (0 1 0 ,y)
-     (0 0 1 ,z)
+   `((1 0 0 ,(vec-ref vec 0))
+     (0 1 0 ,(vec-ref vec 1))
+     (0 0 1 ,(vec-ref vec 2))
      (0 0 0  1))))
+
+(defmacro translation-matrix (vec)
+  "Create a 4x4 translation MATRIX using a VEC"
+  `(create-translation-matrix (make-vec-if-list ,vec)))
 
 (declaim (ftype (function (number) matrix) 2d-rotation-matrix))
 (defun 2d-rotation-matrix (angle)
-  "returns a 4x4 rotation matrix"
+  "returns a 4x4 rotation MATRIX"
   (make-matrix-from-data
    `((,(cos angle) ,(- (sin angle)) 0 0)
      (,(sin angle) ,(cos angle) 0 0)
      (0 0 1 0)
      (0 0 0 1))))
 
-(declaim (ftype (function (number number number number number number) matrix)
-		ortho-matrix))
+(declaim (ftype (function (number number number number number number) matrix) ortho-matrix))
 (defun ortho-matrix (top bottom left right near far)
   "create a 4x4 orthographic projection matrix"
   (assert (not (or (equal top bottom)
@@ -116,14 +117,25 @@
 
 (defun perspective-matrix ())
 
-(defun view-matrix (forward-x forward-y forward-z world-up-x world-up-y world-up-z)
-  (let* ((left ())
-	 (up ()))
+(declaim (ftype (function (vec vec vec) matrix) view-matrix))
+(defun create-view-matrix (position-vec forward-vec world-up-vec)
+  (assert (<= 3 (dimension position-vec) (dimension forward-vec) (dimension world-up-vec))
+	  ()  "vec dimensions must be at least 3")
+  (let* ((left (normalise (cross world-up-vec forward-vec)))
+	 (up (cross forward-vec left)))
     (make-matrix-from-data
-     `((1 0 0 0)
-       (0 1 0 0)
-       (0 0 1 0)
-       (,forward-x ,forward-y ,forward-z 1)))))
+     `((,(vec-ref left 0) ,(vec-ref up 0) ,(vec-ref forward-vec 0) 0)
+       (,(vec-ref left 1) ,(vec-ref up 1) ,(vec-ref forward-vec 1) 0)
+       (,(vec-ref left 2) ,(vec-ref up 2) ,(vec-ref forward-vec 2) 0)
+       (,(- (dot left position-vec))
+	,(- (dot up position-vec))
+	,(- (dot forward-vec position-vec))
+	1)))))
+
+(defmacro view-matrix (position forward world-up)
+  `(create-view-matrix (make-vec-if-list ,position)
+		       (make-vec-if-list ,forward)
+		       (make-vec-if-list ,world-up)))
 
 ;;; --- set shader matricies ---
 
