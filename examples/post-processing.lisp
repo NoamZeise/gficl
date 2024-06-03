@@ -102,14 +102,13 @@ void main() {
    (gl:clear :color-buffer)
    (gficl:bind-gl *main-shader*)
    (gficl:bind-matrix *main-shader* "projection"
-;(gficl::angle-persp-mat (gficl:window-width) (gficl:window-height) (* pi 0.3) 0.1 1000)
-		      (gficl::perspective-matrix 0.1 -0.1 -0.1 0.1 0.1 1000))
+     (gficl::3d-perspective-matrix (gficl:window-width) (gficl:window-height) (* pi 0.3) 0.1))
    (gficl:bind-matrix *main-shader* "view"
-		      (gficl::view-matrix '(0.5 0.5 -2) *forward* '(0 1 0)))
+     (gficl::view-matrix '(0.5 0.5 -2) *forward* '(0 1 0)))
    (gficl:bind-matrix *main-shader* "model"
-		      (gficl:*-mat
-		       (gficl:translation-matrix '(0 0 0))
-		       (gficl:scale-matrix '(1 1 1))))
+     (gficl:*mat
+      (gficl:translation-matrix '(0 0 0))
+      (gficl:scale-matrix '(1 1 1))))
    (gficl:draw-vertex-data *cube*)))
 
 (defun run ()

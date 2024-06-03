@@ -52,11 +52,14 @@
    #:bind-matrix
    #:make-matrix
    #:make-matrix-from-data
-   #:*-mat
+   #:*mat
+   #:+mat
    #:scale-matrix
    #:translation-matrix
    #:2d-rotation-matrix
    #:change-of-basis-matrix
    #:view-matrix
-   #:ortho-matrix
-   #:screen-ortho-matrix))
+   #:orthographic-matrix
+   #:screen-orthographic-matrix
+   #:perspective-matrix
+   #:screen-perspective-matrix))
