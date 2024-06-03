@@ -39,6 +39,15 @@
    #:make-shader-from-path
    #:shader-loc
 
+   ;; vectors
+   #:make-vec
+   #:vec-ref
+   #:dot
+   #:+vec
+   #:-vec
+   #:normalise
+   #:cross
+   
    ;; matrices
    #:bind-matrix
    #:make-matrix
@@ -47,5 +56,7 @@
    #:scale-matrix
    #:translation-matrix
    #:2d-rotation-matrix
+   #:change-of-basis-matrix
+   #:view-matrix
    #:ortho-matrix
    #:screen-ortho-matrix))

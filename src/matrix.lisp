@@ -61,7 +61,7 @@
 
 (defun create-scale-matrix (vec)
   "return a 4x4 scaling matrix"
-  (assert (<= 3 (dimension vec)) ()  "vec must have at least 3 dimensions")
+  (assert-min-dim 3 vec)
   (make-matrix-from-data
    `((,(vec-ref vec 0)  0  0 0)
      ( 0 ,(vec-ref vec 1)  0 0)
@@ -74,7 +74,7 @@
 
 (defun create-translation-matrix (vec)
   "returns a 4x4 translation matrix"
-  (assert (<= 3 (dimension vec)) ()  "vec must have at least 3 dimensions")
+  (assert-min-dim 3 vec)
   (make-matrix-from-data
    `((1 0 0 ,(vec-ref vec 0))
      (0 1 0 ,(vec-ref vec 1))
@@ -94,7 +94,32 @@
      (0 0 1 0)
      (0 0 0 1))))
 
-(declaim (ftype (function (number number number number number number) matrix) ortho-matrix))
+(declaim (ftype (function (vec vec vec) (values matrix &optional)) change-of-basis-matrix))
+(defun change-of-basis-matrix (v1 v2 v3)
+  "Create a 4x4 change of basis matrix out of the 3 axes"
+  (assert-min-dim 3 v1 v2 v3)
+  (make-matrix-from-data
+   `((,(vec-ref v1 0) ,(vec-ref v1 1) ,(vec-ref v1 2) 0)
+     (,(vec-ref v2 0) ,(vec-ref v2 1) ,(vec-ref v2 2) 0)
+     (,(vec-ref v3 0) ,(vec-ref v3 1) ,(vec-ref v3 2) 0)
+     (0 0 0 1))))
+
+(declaim (ftype (function (vec vec vec) matrix) view-matrix))
+(defun create-view-matrix (position-vec forward-vec world-up-vec)
+  (assert-min-dim 3 position-vec forward-vec world-up-vec)
+  (let* ((forward (normalise forward-vec))
+	 (left (normalise (cross (normalise world-up-vec) forward)))
+	 (up (cross forward left)))
+    (*-mat (change-of-basis-matrix left up forward) (translation-matrix (-vec position-vec)))))
+
+(defmacro view-matrix (position forward world-up)
+  `(create-view-matrix (make-vec-if-list ,position)
+		       (make-vec-if-list ,forward)
+		       (make-vec-if-list ,world-up)))
+
+(declaim (ftype (function (number number number number number number) matrix)
+		ortho-matrix perspective-matrix))
+
 (defun ortho-matrix (top bottom left right near far)
   "create a 4x4 orthographic projection matrix"
   (assert (not (or (equal top bottom)
@@ -115,27 +140,31 @@
 	  "ortho width and height must be positive: ~ax~a" width height)
   (ortho-matrix 0 height 0 width -1 1))
 
-(defun perspective-matrix ())
-
-(declaim (ftype (function (vec vec vec) matrix) view-matrix))
-(defun create-view-matrix (position-vec forward-vec world-up-vec)
-  (assert (<= 3 (dimension position-vec) (dimension forward-vec) (dimension world-up-vec))
-	  ()  "vec dimensions must be at least 3")
-  (let* ((left (normalise (cross world-up-vec forward-vec)))
-	 (up (cross forward-vec left)))
+(defun perspective-matrix (top bottom left right near far)
+  (let ((2n (* 2 near)))
     (make-matrix-from-data
-     `((,(vec-ref left 0) ,(vec-ref up 0) ,(vec-ref forward-vec 0) 0)
-       (,(vec-ref left 1) ,(vec-ref up 1) ,(vec-ref forward-vec 1) 0)
-       (,(vec-ref left 2) ,(vec-ref up 2) ,(vec-ref forward-vec 2) 0)
-       (,(- (dot left position-vec))
-	,(- (dot up position-vec))
-	,(- (dot forward-vec position-vec))
-	1)))))
+     `((,(/ 2n (- right left)) 0 ,(- (/ (+ right left) (- right left))) 0)
+       (0 ,(/ 2n (- top bottom)) ,(- (/ (+ top bottom) (- top bottom))) 0)
+       (0 0 ,(/ (+ far near) (- far near)) ,(- (/ (* 2n far) (- far near))))
+       (0 0 1 0)))))
 
-(defmacro view-matrix (position forward world-up)
-  `(create-view-matrix (make-vec-if-list ,position)
-		       (make-vec-if-list ,forward)
-		       (make-vec-if-list ,world-up)))
+(declaim (ftype (function (number number number number number) matrix) inf-perspective-matrix))
+(defun inf-perspective-matrix (top bottom left right near)
+  (let ((2n (* 2 near)))
+    (make-matrix-from-data
+     `((,(/ 2n (- right left)) 0 ,(- (/ (+ right left) (- right left))) 0)
+       (0 ,(/ 2n (- top bottom)) ,(- (/ (+ top bottom) (- top bottom))) 0)
+       (0 0 1 ,(- 2n))
+       (0 0 1 0)))))
+
+(defun angle-persp-mat (width height fov near far)
+    (let* ((a (/ width height))
+	   (c (/ 1 (tan (/ fov 2)))))
+    (make-matrix-from-data
+     `((,(/ c a) 0 0 0)
+       (0 ,c 0 0)
+       (0 0 ,(+ (/ (+ far near) (- far near))) ,(- (/ (* 2 far near) (- far near))))
+       (0 0 1 0)))))
 
 ;;; --- set shader matricies ---
 

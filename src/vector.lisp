@@ -65,3 +65,7 @@
 (defmacro make-vec-if-list (vec)
   (if (and (listp vec) (or (equalp (car vec) 'quote) (equalp (car vec) 'list)))
       `(make-vec ,vec) vec))
+
+(defmacro assert-min-dim (dim &rest vecs)
+  (let ((assertions (loop for v in vecs collecting `(dimension ,v))))
+    `(assert (<= ,dim ,@assertions) ()  "vecs must have at least ~a dimensions" ,dim)))
