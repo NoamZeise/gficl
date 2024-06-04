@@ -52,7 +52,11 @@ void main() {
 (defparameter *view* nil)
 (defparameter *model* nil)
 
+;; camera
 (defparameter *forward* nil)
+(defparameter *left* nil)
+(defparameter *up* nil)
+(defparameter *position* nil)
 
 (defun setup ()
   (setf *cube* (gficl:make-vertex-data
@@ -64,8 +68,10 @@ void main() {
   (setf *projection* (gficl:make-matrix))
   (setf *view* (gficl:make-matrix))
 
-  (setf *forward* (gficl::make-vec '(0 0 1)))
-  
+  (setf *forward* (gficl:make-vec '(0 0 1)))
+  (setf *up* (gficl:make-vec '(0 1 0)))
+  (setf *left* (gficl:make-vec '(1 0 0)))
+  (setf *position* (gficl:make-vec'(0.5 0.5 -2)))
   (setf *model* (gficl:make-matrix)))
 
 (defun cleanup ()
@@ -83,28 +89,56 @@ void main() {
 	    (progn (gficl:toggle-fullscreen)
 		   (setf *pressed-last* t)))
       (setf *pressed-last* nil))
-    (let ((speed (* dt 1.0)))
-      (if (equalp (glfw:get-key :w) :press)
-	  (setf (gficl::vec-ref *forward* 1) (+ speed (gficl::vec-ref *forward* 1))))
-      (if (equalp (glfw:get-key :s) :press)
-	  (setf (gficl::vec-ref *forward* 1) (- (gficl::vec-ref *forward* 1) speed)))
-      (if (equalp (glfw:get-key :a) :press)
-	  (setf (gficl::vec-ref *forward* 0) (- (gficl::vec-ref *forward* 0) speed)))
-      (if (equalp (glfw:get-key :d) :press)
-	  (setf (gficl::vec-ref *forward* 0) (+ speed (gficl::vec-ref *forward* 0))))
+    (let ((speed (* dt 1.0))
+	  (ctrl (gficl:make-vec '(0 0))))
+      
+      (if (equalp (glfw:get-key :up) :press)
+	  (setf *position*
+		(gficl:+vec *position* (gficl:*vec speed *forward*))))
+      (if (equalp (glfw:get-key :down) :press)
+	  (setf *position*
+		(gficl:+vec *position* (gficl:*vec (- speed) *forward*))))
+      (if (equalp (glfw:get-key :left) :press)
+	  (setf *position*
+		(gficl:+vec *position* (gficl:*vec (- speed) *left*))))
+      (if (equalp (glfw:get-key :right) :press)
+	  (setf *position*
+		(gficl:+vec *position* (gficl:*vec speed *left*))))
       (if (equalp (glfw:get-key :space) :press)
-	  (setf (gficl::vec-ref *forward* 2) (+ speed (gficl::vec-ref *forward* 2))))
+	  (setf *position*
+		(gficl:+vec *position* (list 0 speed 0))))
       (if (equalp (glfw:get-key :left-shift) :press)
-	  (setf (gficl::vec-ref *forward* 2) (- (gficl::vec-ref *forward* 2) speed))))))
+	  (setf *position*
+		(gficl:+vec *position* (list 0 (- speed) 0))))
+      
+      (if (equalp (glfw:get-key :w) :press)
+	  (setf ctrl (gficl:+vec ctrl '(0 -1))))
+      (if (equalp (glfw:get-key :s) :press)
+	  (setf ctrl (gficl:+vec ctrl '(0 1))))
+      (if (equalp (glfw:get-key :a) :press)
+	  (setf ctrl (gficl:+vec ctrl '(-1 0))))
+      (if (equalp (glfw:get-key :d) :press)
+	  (setf ctrl (gficl:+vec ctrl '(1 0))))
+
+      (let ((ctrl (gficl:*vec (* dt 0.5) ctrl)))
+	(setf *forward*
+	      (gficl:normalise
+	       (gficl:quat-conjugate-vec
+		(gficl:*quat
+		 (gficl:make-unit-quat (gficl:vec-ref ctrl 0) *up*)
+		 (gficl:make-unit-quat (gficl:vec-ref ctrl 1) *left*))
+		*forward*))))
+
+      (multiple-value-setq (*view* *up* *left*)
+			   (gficl::view-matrix *position* *forward* '(0 1 0))))))
 
 (defun draw ()
   (gficl:with-render
    (gl:clear :color-buffer)
    (gficl:bind-gl *main-shader*)
    (gficl:bind-matrix *main-shader* "projection"
-     (gficl::3d-perspective-matrix (gficl:window-width) (gficl:window-height) (* pi 0.3) 0.1))
-   (gficl:bind-matrix *main-shader* "view"
-     (gficl::view-matrix '(0.5 0.5 -2) *forward* '(0 1 0)))
+     (gficl::screen-perspective-matrix (gficl:window-width) (gficl:window-height) (* pi 0.3) 0.1))
+   (gficl:bind-matrix *main-shader* "view" *view*)
    (gficl:bind-matrix *main-shader* "model"
      (gficl:*mat
       (gficl:translation-matrix '(0 0 0))

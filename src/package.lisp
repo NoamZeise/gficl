@@ -45,8 +45,18 @@
    #:dot
    #:+vec
    #:-vec
+   #:*vec
    #:normalise
    #:cross
+   #:get-n-vec
+
+   ;; quaternion
+   #:make-quat
+   #:make-unit-quat
+   #:*quat
+   #:quat-conjugate
+   #:quat-to-vec
+   #:quat-conjugate-vec
    
    ;; matrices
    #:bind-matrix

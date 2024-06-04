@@ -81,7 +81,7 @@
      ( 0  0  0 1))))
 
 (defmacro scale-matrix (vec)
-  "Return a 4x4 scaling MATRIX."
+  "Return a 4x4 scaling MATRIX. Takes either a VEC or a list of numbers."
   `(create-scale-matrix (make-vec-if-list ,vec)))
 
 (defun create-translation-matrix (vec)
@@ -93,7 +93,7 @@
      (0 0 0  1))))
 
 (defmacro translation-matrix (vec)
-  "Create a 4x4 translation MATRIX."
+  "Create a 4x4 translation MATRIX. Takes either a VEC or a list of numbers"
   `(create-translation-matrix (make-vec-if-list ,vec)))
 
 (declaim (ftype (function (number) matrix) 2d-rotation-matrix))
@@ -105,9 +105,8 @@
      (0 0 1 0)
      (0 0 0 1))))
 
-(declaim (ftype (function (vec vec vec) (values matrix &optional)) change-of-basis-matrix))
-(defun change-of-basis-matrix (v1 v2 v3)
-  "Create a 4x4 change of basis MATRIX out of the 3 given axes."
+(declaim (ftype (function (vec vec vec) (values matrix &optional)) create-change-of-basis-matrix))
+(defun create-change-of-basis-matrix (v1 v2 v3)
   (assert-min-dim 3 v1 v2 v3)
   (make-matrix-from-data
    `((,(vec-ref v1 0) ,(vec-ref v1 1) ,(vec-ref v1 2) 0)
@@ -115,17 +114,28 @@
      (,(vec-ref v3 0) ,(vec-ref v3 1) ,(vec-ref v3 2) 0)
      (0 0 0 1))))
 
-(declaim (ftype (function (vec vec vec) matrix) view-matrix))
+(defmacro change-of-basis-matrix (v1 v2 v3)
+  "Create a 4x4 change of basis MATRIX out of the 3 given axes.
+The axes can be a VEC or a list of numbers."
+  `(create-change-of-basis-matrix (make-vec-if-list ,v1)
+				  (make-vec-if-list ,v2)
+				  (make-vec-if-list ,v3)))
+
+(declaim (ftype (function (vec vec vec) (values matrix vec vec)) create-view-matrix))
 (defun create-view-matrix (position-vec forward-vec world-up-vec)
   (assert-min-dim 3 position-vec forward-vec world-up-vec)
   (let* ((forward (normalise forward-vec))
 	 (left (normalise (cross (normalise world-up-vec) forward)))
 	 (up (cross forward left)))
-    (*-mat (change-of-basis-matrix left up forward) (translation-matrix (-vec position-vec)))))
+    (values
+     (*mat (change-of-basis-matrix left up forward) (translation-matrix (-vec position-vec)))
+     up left)))
 
 (defmacro view-matrix (position forward world-up)
   "create a 4x4 view MATRIX pointing along the FORWARD vector at the given POSITION.
-FORWARD and WORLD-UP must be non-zero, and are automatically normalised."
+FORWARD and WORLD-UP must be non-zero, and are automatically normalised.
+the args can be given as a VEC or a list of numbers.
+returns the view matrix and the left and up vectors."
   `(create-view-matrix (make-vec-if-list ,position)
 		       (make-vec-if-list ,forward)
 		       (make-vec-if-list ,world-up)))
@@ -150,7 +160,7 @@ FORWARD and WORLD-UP must be non-zero, and are automatically normalised."
   "create a 4x4 orthographic projection MATRIX with depth -1 to 1 based on the screen dimension"
   (assert (and (> width 0) (> height 0)) ()
 	  "ortho width and height must be positive: ~ax~a" width height)
-  (ortho-matrix 0 height 0 width -1 1))
+  (orthographic-matrix 0 height 0 width -1 1))
 
 (declaim (ftype (function (number number number number number &optional number) matrix)
 		perspective-matrix))
