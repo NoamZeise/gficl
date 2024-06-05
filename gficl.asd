@@ -11,6 +11,7 @@
                 :components 
                 ((:file "package")
 		 (:file "gficl" :depends-on ("matrix" "vertex" "framebuffer"))
+		 (:file "input")
 		 (:file "types")
 		 (:file "vector")
 		 (:file "quaternion" :depends-on ("vector"))

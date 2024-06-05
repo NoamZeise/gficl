@@ -10,6 +10,10 @@
    #:closed-p
    #:toggle-fullscreen
    #:set-fullscreen
+
+   ;; input
+   #:if-key
+   #:map-keys
    
    ;; gl objects
    #:id

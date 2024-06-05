@@ -67,7 +67,7 @@ void main() {
 		(getf *cube-data* :indices)))
   (setf *main-shader* (gficl:make-shader *main-vert-code* *main-frag-code*))
   
-  (setf *projection* (gficl:make-matrix))
+  (resize (gficl:window-width) (gficl:window-height))
   (setf *view* (gficl:make-matrix))
 
   (setf *forward* (gficl:make-vec '(0 0 1)))
@@ -75,6 +75,9 @@ void main() {
   (setf *left* (gficl:make-vec '(1 0 0)))
   (setf *position* (gficl:make-vec'(0.5 0.5 -2)))
   (setf *model* (gficl:make-matrix)))
+
+(defun resize (w h)
+  (setf *projection* (gficl::screen-perspective-matrix w h (* pi 0.3) 0.1)))
 
 (defun cleanup ()
   (gficl:delete-gl *cube*)
@@ -84,43 +87,29 @@ void main() {
 
 (defun update ()
   (gficl:with-update (dt)
-    (if (equalp (glfw:get-key :escape) :press)
-	(glfw:set-window-should-close))
-    (if (equalp (glfw:get-key :f) :press)
-	(if (not *pressed-last*)
-	    (progn (gficl:toggle-fullscreen)
-		   (setf *pressed-last* t)))
-      (setf *pressed-last* nil))
+    (gficl:if-key :escape (glfw:set-window-should-close))
+    (gficl:if-key :f (if (not *pressed-last*)
+		   (progn (gficl:toggle-fullscreen)
+			  (setf *pressed-last* t)))
+	    (setf *pressed-last* nil))
     (let ((speed (* dt 1.0))
 	  (ctrl (gficl:make-vec '(0 0))))
-      
-      (if (equalp (glfw:get-key :up) :press)
-	  (setf *position*
-		(gficl:+vec *position* (gficl:*vec speed *forward*))))
-      (if (equalp (glfw:get-key :down) :press)
-	  (setf *position*
-		(gficl:+vec *position* (gficl:*vec (- speed) *forward*))))
-      (if (equalp (glfw:get-key :left) :press)
-	  (setf *position*
-		(gficl:+vec *position* (gficl:*vec (- speed) *left*))))
-      (if (equalp (glfw:get-key :right) :press)
-	  (setf *position*
-		(gficl:+vec *position* (gficl:*vec speed *left*))))
-      (if (equalp (glfw:get-key :space) :press)
-	  (setf *position*
-		(gficl:+vec *position* (list 0 speed 0))))
-      (if (equalp (glfw:get-key :left-shift) :press)
-	  (setf *position*
-		(gficl:+vec *position* (list 0 (- speed) 0))))
-      
-      (if (equalp (glfw:get-key :w) :press)
-	  (setf ctrl (gficl:+vec ctrl '(0 -1))))
-      (if (equalp (glfw:get-key :s) :press)
-	  (setf ctrl (gficl:+vec ctrl '(0 1))))
-      (if (equalp (glfw:get-key :a) :press)
-	  (setf ctrl (gficl:+vec ctrl '(-1 0))))
-      (if (equalp (glfw:get-key :d) :press)
-	  (setf ctrl (gficl:+vec ctrl '(1 0))))
+
+      ;; movement
+      (gficl:map-keys
+       ((:up (setf *position*    (gficl:+vec *position* (gficl:*vec speed *forward*))))	
+	(:down (setf *position*  (gficl:+vec *position* (gficl:*vec (- speed) *forward*))))	
+	(:left (setf *position*  (gficl:+vec *position* (gficl:*vec (- speed) *left*))))
+	(:right (setf *position* (gficl:+vec *position* (gficl:*vec speed *left*))))
+	(:space (setf *position*      (gficl:+vec *position* (list 0 speed 0))))
+	(:left-shift (setf *position* (gficl:+vec *position* (list 0 (- speed) 0))))))
+
+      ;; view
+      (gficl:map-keys
+       ((:w (setf ctrl (gficl:+vec ctrl '(0 -1))))
+	(:s (setf ctrl (gficl:+vec ctrl '(0 1))))
+	(:a (setf ctrl (gficl:+vec ctrl '(-1 0))))
+	(:d (setf ctrl (gficl:+vec ctrl '(1 0))))))
 
       (let ((ctrl (gficl:*vec (* dt 0.5) ctrl)))
 	(setf *forward*
@@ -138,8 +127,7 @@ void main() {
   (gficl:with-render
    (gl:clear :color-buffer)
    (gficl:bind-gl *main-shader*)
-   (gficl:bind-matrix *main-shader* "projection"
-     (gficl::screen-perspective-matrix (gficl:window-width) (gficl:window-height) (* pi 0.3) 0.1))
+   (gficl:bind-matrix *main-shader* "projection" *projection*)
    (gficl:bind-matrix *main-shader* "view" *view*)
    (gficl:bind-matrix *main-shader* "model"
      (gficl:*mat
@@ -149,7 +137,7 @@ void main() {
 
 (defun run ()
   (gficl:with-window
-   (:title "post-processing" :width 600 :height 400)
+   (:title "post-processing" :width 600 :height 400 :resize-callback #'resize)
    (setup)
    (loop until (gficl:closed-p)
 	 do (update)

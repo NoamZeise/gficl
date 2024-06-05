@@ -87,7 +87,6 @@ void main() {
   (setf *rot* 0))
 
 (defun resize (w h)
-  (gl:viewport 0 0 w h)
   (if *fb* (gficl:delete-gl *fb*))
   (setf *fb* (gficl:make-framebuffer *fb-attachments* w h *samples*))
   (setf *bg-model* (gficl:scale-matrix (list w h 1)))
@@ -131,11 +130,11 @@ void main() {
 
 (defun update ()
   (gficl:with-update (dt)
-    (if (equalp (glfw:get-key :escape) :press)
+    (gficl:if-key :escape
 	(glfw:set-window-should-close))		     
     (setf *rot* (+ *rot* (* dt 1)))
    ;(if (> dt 0) (format t "fps: ~a~%" (round (/ 1 dt))))
-    (if (equalp (glfw:get-key :f) :press)
+    (gficl:if-key :f
 	(if (not *pressed-last*)
 	    (progn (gficl:toggle-fullscreen)
 		   (setf *pressed-last* t)))

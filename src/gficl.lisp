@@ -133,5 +133,6 @@ RESIZE-CALLBACK is only called when width and height are non-zero."
   (declare (ignore window))
   (setf (win-width *state*) w)
   (setf (win-height *state*) h)
+  (gl:viewport 0 0 w h)
   (if (not (or (= w 0) (= h 0)))
       (funcall (resize-fn *state*) w h)))
