@@ -22,6 +22,10 @@
 	   "vec pos was out of range.")
   `(aref (slot-value ,vec 'data) ,pos))
 
+(defmacro make-vec-if-list (vec)
+  (if (and (listp vec) (or (equalp (car vec) 'quote) (equalp (car vec) 'list)))
+      `(make-vec ,vec) vec))
+
 (declaim (ftype (function (vec vec) number) dot))
 (defun dot (v1 v2)
   "dot product of two VECs, extra dimensions are ignored"
@@ -46,16 +50,20 @@
   "add one or more vectors together. vecs can be given as a list of numbers."
   `(internal-+vec (make-vec-if-list ,vec) ,@(loop for v in vecs collecting `(make-vec-if-list ,v))))
 
-(declaim (ftype (function (vec &optional vec) (values vec &optional)) -vec))
-(defun -vec (vec1 &optional vec2)
-  "negate a VEC or take one VEC away from another."
+(declaim (ftype (function (vec &optional vec) (values vec &optional)) internal--vec))
+(defun internal--vec (vec1 &optional vec2)
   (flet ((negate-vec (vec)
 		     (make-vec (loop for x across (slot-value vec 'data) collecting (- x)))))
 	(if vec2 (+vec vec1 (negate-vec vec2))
 	  (negate-vec vec1))))
 
+(defmacro -vec (vec1 &optional vec2)
+  "negate a VEC or take one VEC away from another."
+  `(internal--vec ,@(remove nil (list `(make-vec-if-list ,vec1)
+				      (if vec2 `(make-vec-if-list ,vec2))))))
+
 (defgeneric normalise (obj)
-  (:documentation "normalise an object"))
+	    (:documentation "normalise an object"))
 
 (defmethod normalise ((vec vec))
   "normalise a vector."
@@ -88,7 +96,3 @@
 (defun add-dimension (vec &rest nums)
   "return a VEC with an additional dimension."
   (make-vec (nconc (loop for x across (slot-value vec 'data) collecting x) nums)))
-
-(defmacro make-vec-if-list (vec)
-  (if (and (listp vec) (or (equalp (car vec) 'quote) (equalp (car vec) 'list)))
-      `(make-vec ,vec) vec))

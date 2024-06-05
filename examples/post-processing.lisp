@@ -7,12 +7,21 @@
 
 (defparameter *cube-data*
   (list :verts
-	'(((0 0 0) (0 0))
-	  ((1 0 0) (1 0))
-	  ((1 1 0) (1 1))
-	  ((0 1 0) (0 1)))
+	'(((-1 -1 -1) (0 0))
+	  ((-1 -1  1) (1 0))
+	  ((-1  1 -1) (1 1))
+	  ((-1  1  1) (0 1))
+	  (( 1 -1 -1) (0 0))
+	  (( 1 -1  1) (1 0))
+	  (( 1  1 -1) (1 1))
+	  (( 1  1  1) (0 1)))
 	:indices
-	'(0 3 2 2 1 0)))
+	'(2 1 0 1 2 3
+	  4 5 6 7 6 5
+	  0 1 4 5 4 1
+	  6 3 2 3 6 7
+	  4 2 0 2 4 6
+	  1 3 5 7 5 3)))
 
 (defparameter *main-vert-code*
   "#version 330
@@ -20,7 +29,7 @@ layout (location = 0) in vec3 vertex;
 layout (location = 1) in vec2 inTex;
 
 out vec2 outTex;
-out vec3 outPos;
+out vec3 pos;
 
 uniform mat4 model;
 uniform mat4 view;
@@ -28,8 +37,8 @@ uniform mat4 projection;
 
 void main() {
  outTex = inTex;
- outPos = vec3(model * vec4(vertex, 1));
- gl_Position = projection * view * vec4(outPos, 1);
+ pos = vec3(model * vec4(vertex, 1));
+ gl_Position = projection * view * vec4(pos, 1);
 }")
 (defparameter *main-frag-code*
   "#version 330
@@ -38,7 +47,7 @@ in vec3 pos;
 out vec4 colour;
 
 void main() {
-  colour = vec4(1, 0, 1, 1);
+  colour = vec4(sin(1.5*pos.x), cos(1.5*pos.y), tan(1.5*pos.z), 1);
 }")
 
 (defparameter *post-vert-code* nil)
@@ -47,6 +56,7 @@ void main() {
 (defparameter *cube* nil)
 
 (defparameter *fb* nil)
+
 (defparameter *main-shader* nil)
 (defparameter *post-shader* nil)
 
@@ -70,11 +80,12 @@ void main() {
   (resize (gficl:window-width) (gficl:window-height))
   (setf *view* (gficl:make-matrix))
 
-  (setf *forward* (gficl:make-vec '(0 0 1)))
   (setf *up* (gficl:make-vec '(0 1 0)))
   (setf *left* (gficl:make-vec '(1 0 0)))
-  (setf *position* (gficl:make-vec'(0.5 0.5 -2)))
-  (setf *model* (gficl:make-matrix)))
+  (setf *position* (gficl:make-vec'(5 4 5)))
+  (setf *forward* (gficl:-vec '(0 0 0) *position*))
+  (setf *model* (gficl:make-matrix))
+  (gl:enable :blend :cull-face :depth-test))
 
 (defun resize (w h)
   (setf *projection* (gficl::screen-perspective-matrix w h (* pi 0.3) 0.1)))
@@ -87,11 +98,12 @@ void main() {
 
 (defun update ()
   (gficl:with-update (dt)
+    
     (gficl:if-key :escape (glfw:set-window-should-close))
     (gficl:if-key :f (if (not *pressed-last*)
-		   (progn (gficl:toggle-fullscreen)
-			  (setf *pressed-last* t)))
-	    (setf *pressed-last* nil))
+			 (progn (gficl:toggle-fullscreen)
+				(setf *pressed-last* t)))
+		  (setf *pressed-last* nil))
     (let ((speed (* dt 1.0))
 	  (ctrl (gficl:make-vec '(0 0))))
 
@@ -125,15 +137,17 @@ void main() {
 
 (defun draw ()
   (gficl:with-render
-   (gl:clear :color-buffer)
+   (gl:clear :color-buffer :depth-buffer)
    (gficl:bind-gl *main-shader*)
    (gficl:bind-matrix *main-shader* "projection" *projection*)
    (gficl:bind-matrix *main-shader* "view" *view*)
-   (gficl:bind-matrix *main-shader* "model"
-     (gficl:*mat
-      (gficl:translation-matrix '(0 0 0))
-      (gficl:scale-matrix '(1 1 1))))
-   (gficl:draw-vertex-data *cube*)))
+   (loop for x from -5 to 5 do
+	 (loop for y from -5 to 5 do
+	       (gficl:bind-matrix *main-shader* "model"
+				  (gficl:*mat
+				   (gficl:translation-matrix (list (* x 5) 0 (* y 5)))
+				   (gficl:scale-matrix '(1 1 1))))
+	       (gficl:draw-vertex-data *cube*)))))
 
 (defun run ()
   (gficl:with-window
