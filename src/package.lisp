@@ -12,8 +12,10 @@
    #:set-fullscreen
 
    ;; input
-   #:if-key
-   #:map-keys
+   #:key-down
+   #:key-pressed
+   #:map-keys-down
+   #:map-keys-pressed
    
    ;; gl objects
    #:id
@@ -50,6 +52,7 @@
    #:+vec
    #:-vec
    #:*vec
+   #:magnitude
    #:normalise
    #:cross
    #:get-n-vec

@@ -1,4 +1,4 @@
-(in-package :gficl-examples.basic)
+(in-package :gficl-examples.quad-spin)
 
 (defparameter *samples* 1)
 
@@ -6,7 +6,6 @@
   (list (gficl:make-attachment-description :color-attachment0)
 	(gficl:make-attachment-description :depth-stencil-attachment)))
 (defparameter *fb* nil)
-
 
 ;; shader
 (defparameter *shader* nil)
@@ -102,7 +101,7 @@ void main() {
 
 (defun run ()
   (gficl:with-window
-   (:title "basic" :width 500 :height 500 :resize-callback #'resize)
+   (:title "spinning quad" :width 500 :height 500 :resize-callback #'resize)
    (setup)
     (loop until (gficl:closed-p)
 	  do (update)
@@ -126,27 +125,19 @@ void main() {
 
    (gficl:blit-framebuffers *fb* 0 (gficl:window-width) (gficl:window-height))))
 
-(defparameter *pressed-last* nil)
-
 (defun update ()
   (gficl:with-update (dt)
-    (gficl:if-key :escape
-	(glfw:set-window-should-close))		     
+    (if (gficl:key-pressed :escape) (glfw:set-window-should-close))		     
+    (if (gficl:key-pressed :f) (gficl:toggle-fullscreen))
     (setf *rot* (+ *rot* (* dt 1)))
-   ;(if (> dt 0) (format t "fps: ~a~%" (round (/ 1 dt))))
-    (gficl:if-key :f
-	(if (not *pressed-last*)
-	    (progn (gficl:toggle-fullscreen)
-		   (setf *pressed-last* t)))
-      (setf *pressed-last* nil)))
-  (setf *model*
-	(let* ((w (gficl:window-width))
-	       (h (gficl:window-height))
-	       (size (* 0.7 (min w h)))
-	       (half (/ size 2)))
-	  (gficl:*mat
-	   (gficl:translation-matrix (list (- (/ w 2) half) (- (/ h 2) half) 0.1))
-	   (gficl:translation-matrix (list half half 0))
-	   (gficl:2d-rotation-matrix *rot*)
-	   (gficl:translation-matrix (list (- half) (- half) 0))
-	   (gficl:scale-matrix (list size size 1))))))
+    (setf *model*
+	  (let* ((w (gficl:window-width))
+		 (h (gficl:window-height))
+		 (size (* 0.7 (min w h)))
+		 (half (/ size 2)))
+	    (gficl:*mat
+	     (gficl:translation-matrix (list (- (/ w 2) half) (- (/ h 2) half) 0.1))
+	     (gficl:translation-matrix (list half half 0))
+	     (gficl:2d-rotation-matrix *rot*)
+	     (gficl:translation-matrix (list (- half) (- half) 0))
+	     (gficl:scale-matrix (list size size 1)))))))

@@ -62,6 +62,13 @@
   `(internal--vec ,@(remove nil (list `(make-vec-if-list ,vec1)
 				      (if vec2 `(make-vec-if-list ,vec2))))))
 
+(declaim (ftype (function (vec) number) internal-magnitude))
+(defun internal-magnitude (vec)
+  (sqrt (dot vec vec)))
+
+(defmacro magnitude (vec)
+  `(internal-magnitude (make-vec-if-list ,vec)))
+
 (defgeneric normalise (obj)
 	    (:documentation "normalise an object"))
 

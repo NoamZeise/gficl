@@ -1,8 +1,5 @@
 (in-package :gficl)
 
-(defparameter *state* nil
-  "store internal state of render")
-
 (defun closed-p ()
   "check if the window is to be closed"
   (glfw:window-should-close-p))
@@ -21,8 +18,8 @@
 (defmacro with-update ((&optional frame-time-var) &body body)
   "poll input and window events. frame-time-var gives the seconds since last update"
   (if frame-time-var
-      `(let ((,frame-time-var (update-frame-time))) (glfw:poll-events) ,@body)
-    `(progn (glfw:poll-events) ,@body)))
+      `(let ((,frame-time-var (update-frame-time))) (update-render-state) (glfw:poll-events) ,@body)
+    `(progn (glfw:poll-events) ,@body (update-render-state))))
 
 (defmacro with-render (&body body)
   "enclose gl render calls, swaps the backbuffer at end."
@@ -48,10 +45,12 @@
       (vsync t)
       (opengl-version-major 3)
       (opengl-version-minor 3)
-      (resize-callback '(lambda (w h) (declare (ignore w h)))))
+      (resize-callback '(lambda (w h) (declare (ignore w h))))
+      (pre-window-fn '(lambda () ())))
      &body body &environment env)
   "Open a glfw window in the body of this function. 
-RESIZE-CALLBACK is only called when width and height are non-zero."
+RESIZE-CALLBACK is only called when width and height are non-zero.
+PRE-WINDOW-FN is called after glfw is initialised but before a window is created."
   `(progn
      ,(macro-check-type title string env)
      ,(macro-check-type width integer env)
@@ -61,17 +60,19 @@ RESIZE-CALLBACK is only called when width and height are non-zero."
 	   (make-instance 'render-state :width ,width :height ,height :resize-fn ,resize-callback))
      (setf *active-objects* 0)
      ;; keys found in glfw:create-window
-     (glfw:with-init-window
-      (:title ,title :width ,width :height ,height :visible ,visible
-	      :context-version-major ,opengl-version-major
-	      :context-version-minor ,opengl-version-minor)
-      (register-glfw-callbacks)
-      (glfw:set-input-mode :cursor ,cursor)
-      (glfw:swap-interval (if ,vsync 1 0))
-      ,@body
-      (if (not (= 0 *active-objects*))
-	  (format t "~%Warning: ~a gl object~:p ~:*~[ ~;was~:;were~] not freed~%"
-		  *active-objects*)))))
+     (glfw:with-init
+      (funcall ,pre-window-fn)
+      (glfw:with-window 
+       (:title ,title :width ,width :height ,height :visible ,visible
+	       :context-version-major ,opengl-version-major
+	       :context-version-minor ,opengl-version-minor )
+       (register-glfw-callbacks)
+       (glfw:set-input-mode :cursor ,cursor)
+       (glfw:swap-interval (if ,vsync 1 0))
+       ,@body
+       (if (not (= 0 *active-objects*))
+	   (format t "~%Warning: ~a gl object~:p ~:*~[ ~;was~:;were~] not freed~%"
+		   *active-objects*))))))
 
 (declaim (ftype (function (boolean)) set-fullscreen))
 (defun set-fullscreen (bool)
@@ -95,29 +96,6 @@ RESIZE-CALLBACK is only called when width and height are non-zero."
 			      monitor x y width height refresh)
     (setf (fullscreen *state*) bool)))
 
-;;; --- Helpers ---
-
-(defclass render-state ()
-  ((width :initarg :width :accessor win-width :type integer)
-   (height :initarg :height :accessor win-height :type integer)
-   (prev-x :initform 0 :accessor prev-x :type integer)
-   (prev-y :initform 0 :accessor prev-y :type integer)
-   (prev-width :initform 0 :accessor prev-width :type integer)
-   (prev-height :initform 0 :accessor prev-height :type integer)
-   (resize-fn :initarg :resize-fn :accessor resize-fn :type (function (integer integer)))
-   (frame-time :initform (get-internal-real-time) :accessor frame-time :type integer)
-   (prev-frame-time :initform (get-internal-real-time) :accessor prev-frame-time :type integer)
-   (fullscreen :initform nil :accessor fullscreen :type boolean))
-  (:documentation "stores interal state of the renderer"))
-
-(defun update-frame-time ()
-  (let ((dt 0))
-    (setf (frame-time *state*) (get-internal-real-time))
-    (setf dt (/ (- (frame-time *state*) (prev-frame-time *state*))
-		internal-time-units-per-second))
-    (setf (prev-frame-time *state*) (frame-time *state*))
-    dt))
-
 ;;; ------------- GLFW CALLBACKS -----------------
 
 (defun register-glfw-callbacks ()
@@ -127,7 +105,8 @@ RESIZE-CALLBACK is only called when width and height are non-zero."
   (glfw:set-window-size-callback 'resize-callback))
 
 (glfw:def-key-callback quit-with-esc (window key scancode action mod-keys)
-  (declare (ignore scancode mod-keys)))
+  (declare (ignore window scancode mod-keys))
+  (update-key-state (render-input *state*) key action))
 
 (glfw:def-window-size-callback resize-callback (window w h)
   (declare (ignore window))

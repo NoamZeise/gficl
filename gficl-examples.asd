@@ -9,5 +9,5 @@
   :components ((:module "examples"
 		:components
 		((:file "package")
-		 (:file "basic")
-		 (:file "post-processing")))))
+		 (:file "quad-spin")
+		 (:file "cube-wave")))))

@@ -10,8 +10,9 @@
   :components ((:module "src"
                 :components 
                 ((:file "package")
-		 (:file "gficl" :depends-on ("matrix" "vertex" "framebuffer"))
-		 (:file "input")
+		 (:file "gficl" :depends-on ("input"))
+		 (:file "input" :depends-on ("state"))
+		 (:file "state")
 		 (:file "types")
 		 (:file "vector")
 		 (:file "quaternion" :depends-on ("vector"))
