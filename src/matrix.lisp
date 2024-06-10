@@ -185,6 +185,12 @@ fov is in radians."
 	 (top (* near angle)))
     (perspective-matrix top (- top) (- right) right near far)))
 
+(defun target-resolution-matrix (current-width current-height final-width final-height)
+  "create a 4x4 MATRIX for transforming from one resolution to another."
+    (let ((ratio (/ (* current-width final-height) (* current-height final-width))))
+    (gficl:scale-matrix
+     (list (if (< ratio 1) ratio 1) (if (> ratio 1) (/ 1 ratio) 1) 1))))
+
 ;;; --- set shader matrices ---
 
 (defmacro with-foreign-matrix ((var matrix) &body body)

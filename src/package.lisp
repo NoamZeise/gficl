@@ -79,4 +79,5 @@
    #:orthographic-matrix
    #:screen-orthographic-matrix
    #:perspective-matrix
-   #:screen-perspective-matrix))
+   #:screen-perspective-matrix
+   #:target-resolution-matrix))

@@ -84,7 +84,7 @@ void main() {
   (gficl:bind-gl *main-shader*)
   (gl:uniformi (gficl:shader-loc *main-shader* "dim") *cubes-dim*)
   (gficl:bind-matrix *main-shader* "model" (gficl:scale-matrix '(1 5 1)))
-
+  
   (setf *fb* nil)
   (resize (gficl:window-width) (gficl:window-height))
   (setf *view* (gficl:make-matrix))

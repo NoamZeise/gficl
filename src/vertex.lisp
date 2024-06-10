@@ -3,7 +3,7 @@
 ;;; --- vertex shader input form ---
 
 (deftype vertex-elem-type ()
-	 '(member :float :double :int :unsigned-int :char :unsigned-char :short :unsigned-short))
+	 '(member :float :double :int :unsigned-int :short :unsigned-short))
 
 (defclass vertex-slot ()
   ((vector-size :initarg :vector-size :accessor vector-size :type integer)

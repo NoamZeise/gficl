@@ -10,4 +10,5 @@
 		:components
 		((:file "package")
 		 (:file "quad-spin")
-		 (:file "cube-wave")))))
+		 (:file "cube-wave")
+		 (:file "post-processing")))))

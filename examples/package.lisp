@@ -7,3 +7,7 @@
 (defpackage gficl-examples.cube-wave
 	    (:use :cl)
 	    (:export #:run))
+
+(defpackage gficl-examples.post-processing
+	    (:use :cl)
+	    (:export #:run))

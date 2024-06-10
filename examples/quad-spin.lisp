@@ -99,15 +99,6 @@ void main() {
   (if *fb* (gficl:delete-gl *fb*))
   (gficl:delete-gl *quad*))
 
-(defun run ()
-  (gficl:with-window
-   (:title "spinning quad" :width 500 :height 500 :resize-callback #'resize)
-   (setup)
-    (loop until (gficl:closed-p)
-	  do (update)
-	  do (render))
-    (cleanup)))
-
 (defun render ()
   (gficl:with-render   
    (gficl:bind-gl *fb*)
@@ -141,3 +132,12 @@ void main() {
 	     (gficl:2d-rotation-matrix *rot*)
 	     (gficl:translation-matrix (list (- half) (- half) 0))
 	     (gficl:scale-matrix (list size size 1)))))))
+
+(defun run ()
+  (gficl:with-window
+   (:title "spinning quad" :width 500 :height 500 :resize-callback #'resize)
+   (setup)
+    (loop until (gficl:closed-p)
+	  do (update)
+	  do (render))
+    (cleanup)))

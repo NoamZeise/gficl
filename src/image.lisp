@@ -63,15 +63,21 @@ If samples > 1, a multisample texture will be created which does not use the dat
 	       (gl:tex-parameter type :texture-wrap-t wrap)
 	       (gl:tex-parameter type :texture-min-filter filter)
 	       (gl:tex-parameter type :texture-mag-filter filter)))
+    (create-gl)
     (make-instance 'texture :id id :tex-type type :samples samples)))
 
 (declaim (ftype (function (integer
 			   integer
 			   (function (integer integer) list)
-			   &key (:channels integer))
+			   &key
+			   (:channels integer)
+			   (:mipmapping boolean)
+			   (:wrap texture-wrap)
+			   (:filter texture-filter))
 			  (values texture &optional))
 		make-texture-with-fn))
-(defun make-texture-with-fn (width height fn &key (channels 4))
+(defun make-texture-with-fn (width height fn &key
+				   (channels 4) (mipmapping nil) (wrap :repeat) (filter :nearest))
   "FN is called for each pixel with x y args and must return CHANNELS number of bytes"
   (declare (integer channels))
   (assert (and (>= channels 1) (<= channels 4))
@@ -91,8 +97,8 @@ If samples > 1, a multisample texture will be created which does not use the dat
 			(setf (cffi:mem-aref
 			       data :uchar (+ (* y width channels) (* x channels) channel))
 			      value)))))
-    (create-gl)
-    (gficl::make-texture width height :data data :format (get-image-format channels))))
+    (gficl::make-texture width height :data data :format (get-image-format channels)
+			 :mipmapping mipmapping :wrap wrap :filter filter)))
 
 (defmethod delete-gl ((obj texture))
    (gl:delete-texture (id obj))
