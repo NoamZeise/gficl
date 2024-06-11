@@ -19,8 +19,7 @@ out  vec4 colour;
 
 void main() {
    colour = vec4(1);
-}
-")
+}")
 
 (defparameter *post-vert*
   "#version 330
@@ -73,10 +72,8 @@ void main() { colour = texture(screen, uv); }")
 (defparameter *cube* nil)
 
 (defun setup ()
-  (gl:enable :depth-test)
-  
-  (setf *samples* (min 8 (gl:get-integer :max-samples)))
-  (if (> *samples* 1) (gl:enable :multisample))
+  ;(setf *samples* (min 8 (gl:get-integer :max-samples)))
+  ;(if (> *samples* 1) (gl:enable :multisample))
   
   (setf *main-shader* (gficl:make-shader *main-vert* *main-frag*))
   (gficl:bind-gl *main-shader*)
@@ -126,10 +123,17 @@ void main() { colour = texture(screen, uv); }")
 (defun draw ()
   (gficl:with-render
    (gficl:bind-gl *offscreen-fb*)
+   (gl:viewport 0 0 *target-width* *target-height*)
+   (gl:clear-color 255 0 0 0)
    (gl:clear :color-buffer :depth-buffer)
+   (gl:enable :depth-test)
    (gficl:bind-gl *main-shader*)
    (gficl:draw-vertex-data *cube*)
    (gl:bind-framebuffer :framebuffer 0)
+   (gl:viewport 0 0 (gficl:window-width) (gficl:window-height))
+   (gl:clear-color 0 0 0 0)
+   (gl:clear :color-buffer)
+   (gl:disable :depth-test)
    (gficl:bind-gl *post-shader*)
    (gl:active-texture :texture0)
    (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *offscreen-fb* 0))
