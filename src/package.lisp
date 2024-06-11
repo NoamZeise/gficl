@@ -64,6 +64,7 @@
    #:quat-conjugate
    #:quat-to-vec
    #:quat-conjugate-vec
+   #:rotate-vec
    
    ;; matrices
    #:bind-matrix

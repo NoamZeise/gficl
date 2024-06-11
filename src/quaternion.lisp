@@ -63,3 +63,8 @@ otherwise returns a 4 dimensional VEC."
 		(make-quat (vec-ref vec 3) v)
 	      (make-quat 0 v))))
     (quat-to-vec (*quat quat q (quat-conjugate quat)) (> d 3))))
+
+(declaim (ftype (function (vec number vec) (values vec &optional)) rotate-vec))
+(defun rotate-vec (point-vec angle axis)
+  "Rotate a point VEC around an axis VEC by an angle in radians."
+  (quat-conjugate-vec (make-unit-quat angle axis) point-vec))

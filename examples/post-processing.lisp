@@ -8,17 +8,25 @@ uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
 
+out vec3 pos;
+
 void main() {
-  gl_Position = projection * view * model * vec4(position, 1);
+  pos = position;
+  gl_Position = projection * view * model * vec4(pos, 1);
 }")
 
 (defparameter *main-frag*
   "#version 330
 
-out  vec4 colour;
+in vec3 pos;
+out vec4 colour;
+
+float fix(float f) {
+ return sqrt(f);
+}
 
 void main() {
-   colour = vec4(1);
+   colour = (pos.z + 0.7)*0.6*vec4(1);
 }")
 
 (defparameter *post-vert*
@@ -60,32 +68,40 @@ void main() { colour = texture(screen, uv); }")
 ;; normal render
 (defparameter *main-shader* nil)
 (defparameter *offscreen-fb* nil)
+(defparameter *resolve-fb* nil)
 
 ;; post-processing 
 (defparameter *dummy-vert* nil)
 (defparameter *post-shader* nil)
 
+;; scene
 (defparameter *target-width* 1000)
 (defparameter *target-height* 700)
-
-;; scene
 (defparameter *cube* nil)
+(defparameter *world-up* (gficl:make-vec '(0 0 1)))
+(defparameter *position* nil)
+(defparameter *target* nil)
 
 (defun setup ()
-  ;(setf *samples* (min 8 (gl:get-integer :max-samples)))
-  ;(if (> *samples* 1) (gl:enable :multisample))
+  (setf *resolve-fb* nil)
+  (setf *samples* (min 8 (gl:get-integer :max-samples)))
+  (if (> *samples* 1)
+      (setf *resolve-fb*
+	    (gficl:make-framebuffer
+	     (list (gficl:make-attachment-description :color-attachment0 :texture))
+	     *target-width* *target-height* 1)))
   
   (setf *main-shader* (gficl:make-shader *main-vert* *main-frag*))
   (gficl:bind-gl *main-shader*)
-  (gficl:bind-matrix *main-shader* "view" (gficl:view-matrix '(5 2 3) '(-5 -2 -3) '(0 0 1)))
   (gficl:bind-matrix *main-shader* "projection"
 		     (gficl:screen-perspective-matrix *target-width* *target-height* 1 0.1))
   (gficl:bind-matrix *main-shader* "model" (gficl:make-matrix))
   (setf *offscreen-fb*
 	(gficl:make-framebuffer
-	 (list (gficl:make-attachment-description :color-attachment0 :texture)
+	 (list (gficl:make-attachment-description :color-attachment0
+						  (if *resolve-fb* :renderbuffer :texture))
 	       (gficl:make-attachment-description :depth-stencil-attachment))
-	 *target-width* *target-height*))
+	 *target-width* *target-height* *samples*))
 
   (setf *cube* (gficl:make-vertex-data
 		(gficl:make-vertex-form (list (gficl:make-vertex-slot 3 :float)))
@@ -98,7 +114,9 @@ void main() { colour = texture(screen, uv); }")
   (setf *dummy-vert*
 	(gficl:make-vertex-data (gficl:make-vertex-form (list (gficl:make-vertex-slot 1 :int)))
 				'(((0))) '(0 0 0)))
-  
+
+  (setf *position* (gficl:make-vec '(5 2 3)))
+  (setf *target* (gficl:make-vec '(0 0 0)))
   (resize (gficl:window-width) (gficl:window-height)))
 
 (defun resize (w h)
@@ -108,42 +126,56 @@ void main() { colour = texture(screen, uv); }")
 
 (defun cleanup ()
   (gficl:delete-gl *cube*)
-  
-  (gficl:delete-gl *offscreen-fb*)
+  (if *resolve-fb* (gficl:delete-gl *resolve-fb*))
+  (gficl:delete-gl *offscreen-fb*)  
   (gficl:delete-gl *main-shader*)
   (gficl:delete-gl *post-shader*)
   (gficl:delete-gl *dummy-vert*))
 
 (defun update ()
-  (gficl:with-update ()
+  (gficl:with-update (dt)
     (gficl:map-keys-pressed
      ((:escape (glfw:set-window-should-close))
-      (:f (gficl:toggle-fullscreen))))))
+      (:f (gficl:toggle-fullscreen))))
+    (gficl:bind-gl *main-shader*)
+    (setf *position* (gficl:rotate-vec *position* (* dt 0.3) *world-up*))
+    (gficl:bind-matrix *main-shader* "view"
+		       (gficl:view-matrix *position* (gficl:-vec '(0 0 0) *position*) *world-up*))))
 
 (defun draw ()
   (gficl:with-render
-   (gficl:bind-gl *offscreen-fb*)
-   (gl:viewport 0 0 *target-width* *target-height*)
-   (gl:clear-color 255 0 0 0)
-   (gl:clear :color-buffer :depth-buffer)
-   (gl:enable :depth-test)
-   (gficl:bind-gl *main-shader*)
-   (gficl:draw-vertex-data *cube*)
-   (gl:bind-framebuffer :framebuffer 0)
-   (gl:viewport 0 0 (gficl:window-width) (gficl:window-height))
-   (gl:clear-color 0 0 0 0)
-   (gl:clear :color-buffer)
-   (gl:disable :depth-test)
-   (gficl:bind-gl *post-shader*)
-   (gl:active-texture :texture0)
-   (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *offscreen-fb* 0))
-   (gficl:bind-gl *dummy-vert*)
-   (gl:draw-arrays :triangles 0 3)))
+   (draw-offscreen)
+   (draw-post)))
+
+(defun draw-offscreen ()
+  (gficl:bind-gl *offscreen-fb*)
+  (gl:viewport 0 0 *target-width* *target-height*)
+  (gl:clear-color 0.5 0.6 0 0)
+  (gl:clear :color-buffer :depth-buffer)
+  (gl:enable :depth-test)
+  (if *resolve-fb* (gl:enable :multisample))
+  (gficl:bind-gl *main-shader*)
+  (gficl:draw-vertex-data *cube*)
+  (if *resolve-fb*
+      (gficl:blit-framebuffers *offscreen-fb* *resolve-fb* *target-width* *target-height*)))
+
+(defun draw-post ()
+  (gl:bind-framebuffer :framebuffer 0)
+  (gl:viewport 0 0 (gficl:window-width) (gficl:window-height))
+  (gl:clear-color 0 0 0 0)
+  (gl:clear :color-buffer)
+  (gl:disable :depth-test :multisample)
+  (gficl:bind-gl *post-shader*)
+  (gl:active-texture :texture0)
+  (gl:bind-texture :texture-2d
+		   (gficl:framebuffer-texture-id (if *resolve-fb* *resolve-fb* *offscreen-fb*) 0))
+  (gficl:bind-gl *dummy-vert*)
+  (gl:draw-arrays :triangles 0 3))
 
 (defun run ()
   (gficl:with-window
    (:title "post processing"
-    :width *target-width* :height *target-height* :resize-callback #'resize)
+	   :width *target-width* :height *target-height* :resize-callback #'resize)
    (setup)
    (loop until (gficl:closed-p)
 	 do (update)
