@@ -66,6 +66,11 @@ void main() { colour = texture(screen, uv); }")
 (defparameter *samples* nil)
 
 ;; normal render
+(defparameter *target-width* 1000)
+(defparameter *target-height* 700)
+(defparameter *fixed-target* nil)
+(defparameter *offscreen-w* nil)
+(defparameter *offscreen-h* nil)
 (defparameter *main-shader* nil)
 (defparameter *offscreen-fb* nil)
 (defparameter *resolve-fb* nil)
@@ -75,33 +80,19 @@ void main() { colour = texture(screen, uv); }")
 (defparameter *post-shader* nil)
 
 ;; scene
-(defparameter *target-width* 1000)
-(defparameter *target-height* 700)
 (defparameter *cube* nil)
 (defparameter *world-up* (gficl:make-vec '(0 0 1)))
 (defparameter *position* nil)
 (defparameter *target* nil)
 
 (defun setup ()
+  (setf *fixed-target* t)
   (setf *resolve-fb* nil)
-  (setf *samples* (min 8 (gl:get-integer :max-samples)))
-  (if (> *samples* 1)
-      (setf *resolve-fb*
-	    (gficl:make-framebuffer
-	     (list (gficl:make-attachment-description :color-attachment0 :texture))
-	     *target-width* *target-height* 1)))
-  
+  (setf *offscreen-fb* nil)
+  (setf *samples* (min 8 (gl:get-integer :max-samples)))  
   (setf *main-shader* (gficl:make-shader *main-vert* *main-frag*))
   (gficl:bind-gl *main-shader*)
-  (gficl:bind-matrix *main-shader* "projection"
-		     (gficl:screen-perspective-matrix *target-width* *target-height* 1 0.1))
   (gficl:bind-matrix *main-shader* "model" (gficl:make-matrix))
-  (setf *offscreen-fb*
-	(gficl:make-framebuffer
-	 (list (gficl:make-attachment-description :color-attachment0
-						  (if *resolve-fb* :renderbuffer :texture))
-	       (gficl:make-attachment-description :depth-stencil-attachment))
-	 *target-width* *target-height* *samples*))
 
   (setf *cube* (gficl:make-vertex-data
 		(gficl:make-vertex-form (list (gficl:make-vertex-slot 3 :float)))
@@ -117,12 +108,36 @@ void main() { colour = texture(screen, uv); }")
 
   (setf *position* (gficl:make-vec '(5 2 3)))
   (setf *target* (gficl:make-vec '(0 0 0)))
+  (if *fixed-target* (make-offscreen *target-width* *target-height*))
   (resize (gficl:window-width) (gficl:window-height)))
 
 (defun resize (w h)
+  (if (not *fixed-target*) (make-offscreen w h))
   (gficl:bind-gl *post-shader*)
   (gficl:bind-matrix *post-shader* "transform"
-		     (gficl:target-resolution-matrix *target-width* *target-height* w h)))
+		     (gficl:target-resolution-matrix *offscreen-w* *offscreen-h* w h)))
+
+(defun make-offscreen (w h)
+  (setf *offscreen-w* w)
+  (setf *offscreen-h* h)
+  (if *resolve-fb* (gficl:delete-gl *resolve-fb*))
+  (setf *resolve-fb* nil)
+  (if (> *samples* 1)
+      (setf *resolve-fb*
+	    (gficl:make-framebuffer
+	     (list (gficl:make-attachment-description :color-attachment0 :texture))
+	     w h)))
+  (if *offscreen-fb* (gficl:delete-gl *offscreen-fb*))
+  (setf *offscreen-fb* nil)
+  (setf *offscreen-fb*
+	(gficl:make-framebuffer
+	 (list (gficl:make-attachment-description :color-attachment0
+						  (if *resolve-fb* :renderbuffer :texture))
+	       (gficl:make-attachment-description :depth-stencil-attachment))
+	 w h *samples*))
+  (gficl:bind-gl *main-shader*)
+  (gficl:bind-matrix *main-shader* "projection"
+		     (gficl:screen-perspective-matrix w h 1 0.1)))
 
 (defun cleanup ()
   (gficl:delete-gl *cube*)
@@ -149,7 +164,7 @@ void main() { colour = texture(screen, uv); }")
 
 (defun draw-offscreen ()
   (gficl:bind-gl *offscreen-fb*)
-  (gl:viewport 0 0 *target-width* *target-height*)
+  (gl:viewport 0 0 *offscreen-w* *offscreen-h*)
   (gl:clear-color 0.5 0.6 0 0)
   (gl:clear :color-buffer :depth-buffer)
   (gl:enable :depth-test)
@@ -157,7 +172,7 @@ void main() { colour = texture(screen, uv); }")
   (gficl:bind-gl *main-shader*)
   (gficl:draw-vertex-data *cube*)
   (if *resolve-fb*
-      (gficl:blit-framebuffers *offscreen-fb* *resolve-fb* *target-width* *target-height*)))
+      (gficl:blit-framebuffers *offscreen-fb* *resolve-fb* *offscreen-w* *offscreen-h*)))
 
 (defun draw-post ()
   (gl:bind-framebuffer :framebuffer 0)
