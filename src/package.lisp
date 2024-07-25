@@ -27,6 +27,7 @@
    #:make-vertex-form
    ;; vertex data
    #:make-vertex-data
+   #:make-vertex-data-from-vectors
    #:draw-vertex-data
 
    ;; image

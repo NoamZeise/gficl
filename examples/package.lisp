@@ -11,3 +11,8 @@
 (defpackage gficl-examples.post-processing
 	    (:use :cl)
 	    (:export #:run))
+
+(defpackage gficl-examples.model-loading
+	    (:use :cl)
+	    (:local-nicknames (#:obj #:org.shirakumo.fraf.wavefront))
+	    (:export #:run))

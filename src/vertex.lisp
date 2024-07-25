@@ -54,26 +54,29 @@ The order must match the vertex locations in the shader"
 
 (declaim (ftype (function (vertex-form list list) (values vertex-data &optional)) make-vertex-data))
 (defun make-vertex-data (vertex-form vertices indices)
-  "Create vertex data using the verticies matching vertex-form"
-  (let* ((vertex-data (vertex-list-to-array vertex-form vertices))
-	 (index-data (index-list-to-array indices))
-	 (vao (gl:gen-vertex-array))
-	 (buffers (gl:gen-buffers 2))
-	 (vbo (elt buffers 0))
-	 (ebo (elt buffers 1)))
-    (gl:bind-vertex-array vao)
-    (gl:bind-buffer :array-buffer vbo)
-    (%gl:buffer-data :array-buffer
-		     (* (length vertices) (vertex-mem-size vertex-form))
-		     vertex-data
-		     :static-draw)
-    (gl:bind-buffer :element-array-buffer ebo)
-    (gl:buffer-data :element-array-buffer :static-draw index-data)
-    (setup-vertex-attrib-array vertex-form)
-    (cffi:foreign-free vertex-data)
-    (gl:free-gl-array index-data)
-    (create-gl)
-    (make-instance 'vertex-data :id vao :vbo vbo :ebo ebo :index-count (length indices))))
+  "Create vertex data using the verticies matching vertex-form.
+I.e if a vertex is a position and a uv, three vertices looks like:
+'(((0 0 0) (0 0))
+  ((0 1 0) (0 1)) 
+  ((1 1 1) (1 1)))"  
+  (make-vertex-data-from-pointers
+   vertex-form
+   (* (length vertices) (vertex-mem-size vertex-form))
+   (vertex-list-to-array vertex-form vertices)
+   (length indices)
+   (cffi:foreign-alloc :int :initial-contents indices)))
+
+(declaim (ftype (function (vertex-form vector vector)
+			  (values vertex-data &optional))
+		make-vertex-data-from-vectors))
+(defun make-vertex-data-from-vectors (vertex-form vertices indices)
+  "Create vertex data using vectors of verticies and indices.
+So the vertex and index data is just a flat vector of floats and integers, respectively."
+  (make-vertex-data-from-pointers
+   vertex-form
+   (* (length vertices) (cffi:foreign-type-size :float))
+   (cffi:foreign-alloc :float :initial-contents vertices)
+   (length indices) (cffi:foreign-alloc :int :initial-contents indices)))
 
 (declaim (ftype (function (vertex-data &key (vertices number)))))
 (defun draw-vertex-data (vertex-data &key (vertices 0 vertp) (instances 1))
@@ -87,11 +90,46 @@ The order must match the vertex locations in the shader"
       (%gl:draw-elements-instanced (draw-mode vertex-data) vertices :unsigned-int 0 instances)
     (%gl:draw-elements (draw-mode vertex-data) vertices :unsigned-int 0)))
 
-
-
 ;;; ----- Helpers -----
 
+(declaim (ftype (function (vertex-form integer cffi:foreign-pointer integer cffi:foreign-pointer))
+		make-vertex-data-from-pointers))
+(defun make-vertex-data-from-pointers
+    (vertex-form vertex-data-size vertex-data index-count index-data)
+  "Takes vertex and index data in raw pointer form.
+vertex data is a foreign pointer, index data is a gl-array. Both are freed by this function."
+  (let* ((vao (gl:gen-vertex-array))	 	 
+	 (buffers (gl:gen-buffers 2))
+	 (vbo (elt buffers 0))
+	 (ebo (elt buffers 1)))
+    (gl:bind-vertex-array vao)
+    (gl:bind-buffer :array-buffer vbo)
+    (%gl:buffer-data :array-buffer
+		     vertex-data-size
+		     vertex-data :static-draw)
+    (gl:bind-buffer :element-array-buffer ebo)
+    (%gl:buffer-data :element-array-buffer
+		     (* index-count (cffi:foreign-type-size :int))
+		     index-data :static-draw)
+    (setup-vertex-attrib-array vertex-form)
+    (cffi:foreign-free vertex-data)
+    (cffi:foreign-free index-data)
+    (create-gl)
+    (make-instance 'vertex-data :id vao :vbo vbo :ebo ebo :index-count index-count)))
+
+(declaim (ftype (function (vertex-form list) cffi:foreign-pointer) vertex-list-to-array))
+(defun vertex-list-to-array (vertex-form vertices)
+  "Create foreign memory to hold the vertex data in.
+Move vertex data vertex by vertex and check that the form matches the vertex form."
+  (let* ((vertex-count (length vertices))
+	 (buff (cffi:foreign-alloc :char :count (* (vertex-mem-size vertex-form) vertex-count)))
+	 (offset 0))
+    (loop for vertex in vertices do
+	  (setf offset (buffer-vertex-data vertex-form vertex buff offset)))
+    buff))
+
 (defun buffer-vertex-data (vertex-form vertex pointer offset)
+  "Destructures a vertex list and check it matches the vertex form. Copy to foreign memory."
   (assert (equalp (length vertex) (length (vertex-slots vertex-form))) (vertex)
 	  "vertex data did not match vertex form: ~a" vertex)
   (loop for slot in (vertex-slots vertex-form)
@@ -109,32 +147,12 @@ The order must match the vertex locations in the shader"
 	      (setf offset (+ offset (cffi:foreign-type-size (element-type slot))))))
   offset)
 
-(declaim (ftype (function (vertex-form list) cffi:foreign-pointer) vertex-list-to-array))
-(defun vertex-list-to-array (vertex-form vertices)
-  ;;todo: make this fn actually do something
-  (let* ((vertex-count (length vertices))
-	 (buff (cffi:foreign-alloc :char :count (* (vertex-mem-size vertex-form) vertex-count)))
-	 (offset 0))
-    (loop for vertex in vertices do
-	  (setf offset (buffer-vertex-data vertex-form vertex buff offset)))
-    buff))
-
-(declaim (ftype (function (list) gl:gl-array) index-list-to-array))
-(defun index-list-to-array (indices)
-  (let* ((count (length indices))
-	 (arr (gl:alloc-gl-array :int count)))
-    (loop for i from 0 for index in indices do
-	  (assert (and (typep index 'integer) (>= index 0)) (index)
-		  "index ~a in indices list was not a number > 0" index)
-	  (setf (gl:glaref arr i) index))
-    arr))
-
 (defun setup-vertex-attrib-array (vertex-form)
   (loop for i from 0
 	for slot in (vertex-slots vertex-form)
 	for offset in (slot-offsets vertex-form) do
-	  (progn
-	    (gl:enable-vertex-attrib-array i)
-	    (gl:vertex-attrib-pointer
-	     i (vector-size slot) (element-type slot) nil
-	     (vertex-mem-size vertex-form) (cffi:make-pointer offset)))))
+	(progn
+	  (gl:enable-vertex-attrib-array i)
+	  (gl:vertex-attrib-pointer
+	   i (vector-size slot) (element-type slot) nil
+	   (vertex-mem-size vertex-form) (cffi:make-pointer offset)))))
