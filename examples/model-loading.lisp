@@ -59,8 +59,8 @@ void main() {
   (setf *view* (gficl:make-matrix))
 
   (setf *world-up* (gficl:make-vec '(0 1 0)))
-  (setf *position* (gficl:make-vec'(1 -0.1 1)))
-  (setf *target* (gficl:make-vec '(0 0.5 0)))
+  (setf *position* (gficl:make-vec'(5 1 5)))
+  (setf *target* (gficl:make-vec '(0 0 0)))
   (update-view 0)
   (gl:enable :cull-face :depth-test :multisample)
   (gl:cull-face :back))

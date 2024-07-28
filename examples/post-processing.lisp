@@ -72,7 +72,7 @@ void main() {
   float amount = 800;
   colour *= 1.1;
   colour += 0.1f;
-  colour *= step(0.1, sin(uv.x*amount*1.4) + cos(uv.y*amount))*0.6 + 0.4;
+  //colour *= step(0.1, sin(uv.x*amount*1.4) + cos(uv.y*amount))*0.6 + 0.4;
 }")
 
 (defparameter *cube-data*
