@@ -22,4 +22,5 @@ runs any expressions which have their key pressed."
 ;; --- helpers ---
 
 (defun key-present (state key)
+  "check if key is present in state hash table"
   (nth-value 1 (gethash key (slot-value state 'key-state))))

@@ -17,16 +17,12 @@ void main() {
 
 (defparameter *main-frag*
   "#version 330
-
 in vec3 pos;
 out vec4 colour;
 
-float fix(float f) {
- return sqrt(f);
-}
-
 void main() {
-   colour = (pos.z + 0.7)*0.6*vec4(1);
+   vec3 p = (pos + vec3(3)) * 0.2;
+   colour = vec4(p.x, p.y, p.z, 1);
 }")
 
 (defparameter *post-vert*
@@ -43,7 +39,32 @@ void main() {
 in vec2 uv;
 out vec4 colour;
 uniform sampler2D screen;
-void main() { colour = texture(screen, uv); }")
+void main() { 
+  if(uv.x > 1 || uv.y > 1) discard;
+  colour = texture(screen, uv);
+  
+  // edge detection
+  mat3 edgeKer = mat3(
+      1,  1, 1,
+      1, -8, 1,
+      1,  1, 1
+  );  
+  float offset = 1.0/200;
+  float finalEdge = 0;
+  for(int x = 0; x < 3; x++) {
+    for(int y = 0; y < 3; y++) {
+      vec4 col = texture(screen, uv + (x-1) * vec2(offset,0) 
+                                    + (y-1) * vec2(0,offset));
+      finalEdge += ((col.r + col.g + col.b)/3) * edgeKer[x][y];
+    }
+  } 
+  finalEdge = (smoothstep(0.1, 0.9, finalEdge) - 0.1)*(1/0.8);
+  colour *= (vec4(1) - vec4(finalEdge, finalEdge, finalEdge, colour.a));
+
+  // dot pattern
+  float amount = 800;
+  colour *= step(0.5, sin(uv.x*amount*1.4) + cos(uv.y*amount))*0.3 + 0.8;
+}")
 
 (defparameter *cube-data*
   (list :verts
@@ -153,7 +174,7 @@ void main() { colour = texture(screen, uv); }")
      ((:escape (glfw:set-window-should-close))
       (:f (gficl:toggle-fullscreen))))
     (gficl:bind-gl *main-shader*)
-    (setf *position* (gficl:rotate-vec *position* (* dt 0.3) *world-up*))
+    (setf *position* (gficl:rotate-vec *position* (* dt 0.3) *world-up*))    
     (gficl:bind-matrix *main-shader* "view"
 		       (gficl:view-matrix *position* (gficl:-vec '(0 0 0) *position*) *world-up*))))
 
@@ -165,7 +186,7 @@ void main() { colour = texture(screen, uv); }")
 (defun draw-offscreen ()
   (gficl:bind-gl *offscreen-fb*)
   (gl:viewport 0 0 *offscreen-w* *offscreen-h*)
-  (gl:clear-color 0.5 0.6 0 0)
+  (gl:clear-color 0.4 0.5 0 0)
   (gl:clear :color-buffer :depth-buffer)
   (gl:enable :depth-test)
   (if *resolve-fb* (gl:enable :multisample))
