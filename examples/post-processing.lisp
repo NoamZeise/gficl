@@ -40,30 +40,39 @@ in vec2 uv;
 out vec4 colour;
 uniform sampler2D screen;
 void main() { 
-  if(uv.x > 1 || uv.y > 1) discard;
+  if(uv.x > 1 || uv.y > 1 || uv.x < 0 || uv.y < 0) discard;
+
+  // posterise
   colour = texture(screen, uv);
+  int colour_count = 8;
+  colour *= colour_count;
+  for(int i = 0; i < 4; i++)
+    colour[i] = floor(colour[i]);
+  colour /= colour_count;
   
   // edge detection
-  mat3 edgeKer = mat3(
+  mat3 edge_ker = mat3(
       1,  1, 1,
       1, -8, 1,
       1,  1, 1
   );  
   float offset = 1.0/200;
-  float finalEdge = 0;
+  float edge_intensity = 0;
   for(int x = 0; x < 3; x++) {
     for(int y = 0; y < 3; y++) {
       vec4 col = texture(screen, uv + (x-1) * vec2(offset,0) 
                                     + (y-1) * vec2(0,offset));
-      finalEdge += ((col.r + col.g + col.b)/3) * edgeKer[x][y];
+      edge_intensity += ((col.r + col.g + col.b)/3) * edge_ker[x][y];
     }
   } 
-  finalEdge = (smoothstep(0.1, 0.9, finalEdge) - 0.1)*(1/0.8);
-  colour *= (vec4(1) - vec4(finalEdge, finalEdge, finalEdge, colour.a));
+  edge_intensity = step(0.1, edge_intensity);
+  colour *= vec4(1) - vec4(edge_intensity);
 
   // dot pattern
   float amount = 800;
-  colour *= step(0.5, sin(uv.x*amount*1.4) + cos(uv.y*amount))*0.3 + 0.8;
+  colour *= 1.1;
+  colour += 0.1f;
+  colour *= step(0.1, sin(uv.x*amount*1.4) + cos(uv.y*amount))*0.6 + 0.4;
 }")
 
 (defparameter *cube-data*
