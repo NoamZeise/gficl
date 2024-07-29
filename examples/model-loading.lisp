@@ -35,21 +35,31 @@ out vec4 colour;
 uniform vec3 cam;
 
 void main() {
-  vec3 obj = vec3(1);
-  vec3 cool = vec3(0, 0, 0.55) + 0.25*obj;
-  vec3 warm = vec3(0.3, 0.3, 0) + 0.5*obj;
-  vec3 highlight = vec3(1);
-
+  // shading constants
+  vec3 object_colour = vec3(1);
+  vec3 cool = vec3(0.2, 0, 0.55) + 0.25*object_colour;
+  vec3 warm = vec3(0.5, 0.3, 0) + 0.5*object_colour;
+  vec3 highlight = vec3(1, 0.8, 0.2);
+  float specular = 30.0f;
+  
   vec3 n = normalize(normal_vec);
-  vec3 l = -vec3(0, 0.2, -1);
+  vec3 l = -vec3(0, 0.2, -1); // light direction
   vec3 v = normalize(cam - pos);
 
+  // gooch shading
   float t = (dot(n,l) + 1)/2.0;
-  vec3 r = 2*dot(n,l)*n - l;
-  float s = clamp(pow(dot(r,v), 30.0f), 0, 1);
+  vec3 r = -reflect(l,n);
+  float s = clamp(pow(dot(r,v), specular), 0, 1);
+  vec3 base = mix(cool, warm,  t);
+  vec3 shaded = mix(base, highlight, s);
+  
+  // edge outline
+  float edge_amount = dot(n, v);
+  float thickness = 0.23;
+  edge_amount = clamp(edge_amount, 0, thickness)*(1/thickness);
+  vec3 edge = vec3(edge_amount);
 
-  vec3 shaded = s*highlight + (1-s)*(t*warm + (1-t)*cool);
-  colour = vec4(shaded.rgb, 1);
+  colour = vec4(shaded*edge, 1);
 }")
 
 (defparameter *bunny* nil)
@@ -71,6 +81,7 @@ void main() {
 		   (obj:vertex-data bunny-mesh)
 		   (obj:index-data bunny-mesh))))
   (setf *main-shader* (gficl:make-shader *main-vert-code* *main-frag-code*))
+  (gl:clear-color 0.8 0.5 0 0)
   (gficl:bind-gl *main-shader*)
   (let ((mat (gficl:scale-matrix '(5 5 5))))
     (gficl:bind-matrix *main-shader* "model" mat)
