@@ -13,23 +13,43 @@ layout (location = 0) in vec3 vertex;
 layout (location = 1) in vec3 normal;
 
 out vec3 pos;
+out vec3 normal_vec;
 
 uniform mat4 model;
+uniform mat4 normal_mat;
 uniform mat4 view;
 uniform mat4 projection;
 
 void main() {
  vec4 world_pos = model * vec4(vertex, 1);
  pos = vec3(world_pos);
+ normal_vec = vec3(normal_mat * vec4(normal, 1));
  gl_Position = projection * view * world_pos;}")
 
 (defparameter *main-frag-code*
   "#version 330
 in vec3 pos;
+in vec3 normal_vec;
 out vec4 colour;
 
+uniform vec3 cam;
+
 void main() {
-  colour = vec4(1);
+  vec3 obj = vec3(1);
+  vec3 cool = vec3(0, 0, 0.55) + 0.25*obj;
+  vec3 warm = vec3(0.3, 0.3, 0) + 0.5*obj;
+  vec3 highlight = vec3(1);
+
+  vec3 n = normalize(normal_vec);
+  vec3 l = -vec3(0, 0.2, -1);
+  vec3 v = normalize(cam - pos);
+
+  float t = (dot(n,l) + 1)/2.0;
+  vec3 r = 2*dot(n,l)*n - l;
+  float s = clamp(pow(dot(r,v), 30.0f), 0, 1);
+
+  vec3 shaded = s*highlight + (1-s)*(t*warm + (1-t)*cool);
+  colour = vec4(shaded.rgb, 1);
 }")
 
 (defparameter *bunny* nil)
@@ -52,7 +72,11 @@ void main() {
 		   (obj:index-data bunny-mesh))))
   (setf *main-shader* (gficl:make-shader *main-vert-code* *main-frag-code*))
   (gficl:bind-gl *main-shader*)
-  (gficl:bind-matrix *main-shader* "model" (gficl:scale-matrix '(5 5 5)))
+  (let ((mat (gficl:scale-matrix '(5 5 5))))
+    (gficl:bind-matrix *main-shader* "model" mat)
+    (gficl:bind-matrix *main-shader* "normal_mat"
+		       (gficl:transpose-matrix
+			(gficl:inverse-matrix mat))))
   
   (setf *fb* nil)
   (resize (gficl:window-width) (gficl:window-height))
@@ -63,7 +87,7 @@ void main() {
   (setf *target* (gficl:make-vec '(0 0 0)))
   (update-view 0)
   (gl:enable :cull-face :depth-test :multisample)
-  (gl:cull-face :back))
+  (gl:cull-face :front))
 
 (defun resize (w h)
   (gficl:bind-gl *main-shader*)
@@ -112,6 +136,7 @@ void main() {
    (gl:clear :color-buffer :depth-buffer)
    (gficl:bind-gl *main-shader*)
    (gficl:bind-matrix *main-shader* "view" *view*)
+   (gficl::internal-bind-vec *main-shader* "cam" *position*)
    (gficl:draw-vertex-data *bunny*)
    (gficl:blit-framebuffers *fb* 0 (gficl:window-width) (gficl:window-height))))
 

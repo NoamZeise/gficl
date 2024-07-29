@@ -73,6 +73,12 @@
    #:make-matrix-from-data
    #:*mat
    #:+mat
+   #:scalar*mat
+   #:transpose-matrix
+   #:cofactor-matrix
+   #:determinant
+   #:inverse-matrix
+   ;; handy matrices
    #:scale-matrix
    #:translation-matrix
    #:2d-rotation-matrix

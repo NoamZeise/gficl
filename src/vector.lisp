@@ -26,6 +26,15 @@
   (if (and (listp vec) (or (equalp (car vec) 'quote) (equalp (car vec) 'list)))
       `(make-vec ,vec) vec))
 
+(defun internal-bind-vec (shader name vec)
+  (let ((location (shader-loc shader name)))
+    (ecase (dimension vec)
+	   (1 (%gl:uniform-1f location (vec-ref vec 0)))
+	   (2 (%gl:uniform-2f location (vec-ref vec 0) (vec-ref vec 1)))
+	   (3 (%gl:uniform-3f location (vec-ref vec 0) (vec-ref vec 1) (vec-ref vec 2)))
+	   (4 (%gl:uniform-3f location
+			      (vec-ref vec 0) (vec-ref vec 1) (vec-ref vec 2) (vec-ref vec 3))))))
+
 (declaim (ftype (function (vec vec) number) dot))
 (defun dot (v1 v2)
   "dot product of two VECs, extra dimensions are ignored"

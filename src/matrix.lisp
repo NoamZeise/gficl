@@ -68,6 +68,48 @@
 			 (loop for v1 in row1 for v2 in row2 collecting (+ v1 v2))))
 		  (cdr mats)))))
 
+(declaim (ftype (function (number matrix) matrix) scalar*mat))
+(defun scalar*mat (scalar matrix)
+  (make-matrix-from-data
+   (loop for row in (slot-value matrix 'data) collecting
+	 (loop for e in row collecting (* scalar e)))))
+
+(declaim (ftype (function (matrix) matrix) transpose-matrix cofactor-matrix inverse-matrix))
+
+(defun transpose-matrix (matrix)
+  (make-matrix-from-data
+   (loop for i from 0 to (- (dimension matrix) 1) collecting
+	 (loop for row in (slot-value matrix 'data) collecting
+	       (car (nthcdr i row))))))
+
+(declaim (ftype (function (matrix integer integer) number) cofactor))
+(defun cofactor (matrix row col)
+  (* (+ 1 (* -2 (mod (+ row col) 2)))
+     (determinant
+      (make-matrix-from-data
+       (loop for i from 0 for r in (slot-value matrix 'data) when (not (= i row)) collecting
+	     (loop for j from 0 for e in r when (not (= j col)) collecting e))))))
+
+(defun cofactor-matrix (matrix)
+  (make-matrix-from-data
+   (loop for i from 0 for row in (slot-value matrix 'data) collecting
+	 (loop for j from 0 for elem in row collecting
+	       (cofactor matrix i j)))))
+
+(declaim (ftype (function (matrix) number) determinant))
+(defun determinant (matrix)
+  "Return the determinant of a matrix."
+  (let ((data (slot-value matrix 'data)) (n (dimension matrix)))
+    (if (= n 1) (caar data)
+      (loop for i from 0 for v in (car data) summing
+	    (* v (cofactor matrix 0 i))))))
+
+(defun inverse-matrix (matrix)
+  "Return the inverse of a matrix. Error if determinant is zero."
+  (let ((det (determinant matrix)))
+    (assert (not (= det 0)) () "Tried to invert a matrix with determinant 0: ~a" matrix)
+    (scalar*mat (/ 1 det) (transpose-matrix (cofactor-matrix matrix)))))
+
 ;;; --- common matrices ---
 
 (declaim (ftype (function (vec) matrix) create-scale-matrix create-translation-matrix))
