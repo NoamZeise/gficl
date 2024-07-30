@@ -54,6 +54,8 @@ If samples > 1, a multisample texture will be created which does not use the dat
   (let ((id (gl:gen-texture))
 	(type (if (> samples 1) :texture-2d-multisample :texture-2d)))
     (gl:bind-texture type id)
+    (if (or (equalp format :red) (equalp format :rgb))
+	(gl:pixel-store :unpack-alignment 1))
     (if (equal type :texture-2d-multisample)
 	(%gl:tex-image-2d-multisample type samples format width height :false)
       (gl:tex-image-2d type 0 format width height 0 format :unsigned-byte data))

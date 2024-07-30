@@ -1,22 +1,100 @@
+(in-package :gficl-examples.font)
 
-(defparameter letter
-   (truetype-clx:text-pixarray #p"examples/assets/Roboto-Black.ttf" "A" 50 100 100))
+(defparameter *font-path* #p"examples/assets/Roboto-Regular.ttf")
+(defparameter *character-range* '(32 126))
+(defparameter *font-ht* nil)
 
-(defparameter tex nil)
+(defparameter *tex* nil)
+(defparameter *quad* nil)
+(defparameter *shader* nil)
 
-(gficl:with-window
- (:title "font" :width 600 :height 400)
- (gl:clear-color 0 1 0 0)
- (destructuring-bind (w h) (array-dimensions letter)
-    (let ((data (cffi:foreign-alloc :unsigned-char :initial-element 255 :count (* w h 4))))
-      (loop for x from 0 to w do
-	    (loop for y from 0 to h do
-		  (setf (cffi:mem-aref data :unsigned-char (+ (* y w 4) (* x 4) 3))
-			(aref letter y x))))
-      (setf tex (gficl:make-texture w h))
-      (cffi:foreign-free data)))
- (loop until (gficl:closed-p)
-       do (gficl:with-update ())
-       do (gficl:with-render
-	   (gl:clear :color-buffer)))
- (gficl:delete-gl tex))
+(defparameter *vert-shader*
+	      "#version 330
+layout (location = 0) in vec2 vertex;
+
+out vec2 TexCoords;
+
+uniform mat4 model;
+uniform mat4 projection;
+
+void main() {
+    TexCoords = vertex;
+    gl_Position = projection * model * vec4(vertex, 0, 1);
+}")
+(defparameter *frag-shader*
+  "#version 330
+
+in vec2 TexCoords;
+out vec4 colour;
+
+uniform sampler2D tex;
+
+void main() {
+  float text_alpha = texture(tex, TexCoords).r;
+  if(text_alpha == 0)
+    discard;
+  vec3 text_colour = vec3(1);
+  colour = vec4(text_colour, text_alpha);
+}")
+
+(defun setup ()
+  (gl:clear-color 0 1 0 0)
+  (gl:enable :blend)
+  (gl:blend-func :src-alpha :one-minus-src-alpha)
+  (setf *shader* (gficl:make-shader *vert-shader* *frag-shader*))
+  (loop for i from 65 to 65 do	
+	(let ((text (truetype-clx:text-pixarray *font-path* (string (code-char i)) 100 600 600)))
+	  (if text
+	      (destructuring-bind (h w) (array-dimensions text)
+				  (let ((data (cffi:foreign-alloc
+					       :unsigned-char :count (* w h))))
+				    (loop for x from 0 below w do
+					  (loop for y from 0 below h do
+						(setf (cffi:mem-aref data :unsigned-char
+								     (+ (* y w) x))
+						      (aref text y x))))
+				    (setf *tex*
+					  (gficl:make-texture w h :data data
+							      :wrap :clamp-to-edge
+							      :format :red))
+				    (cffi:foreign-free data))))))
+  (setf *quad* (gficl:make-vertex-data
+		(gficl:make-vertex-form
+		 (list (gficl:make-vertex-slot 2 :float)))
+		'(((0 0)) ((1 0)) ((1 1)) ((0 1))) '(0 3 2 2 1 0)))
+  (resize (gficl:window-width) (gficl:window-height))
+  (gficl:bind-matrix *shader* "model"
+		     (gficl:*mat
+		      (gficl:translation-matrix '(50 50 0))
+		      (gficl:scale-matrix '(300 300 1)))))
+
+(defun resize (w h)
+  (gficl:bind-gl *shader*)
+   (gficl:bind-matrix *shader* "projection"
+		      (gficl:screen-orthographic-matrix w h)))
+
+(defun cleanup ()
+  (gficl:delete-gl *shader*)
+  (gficl:delete-gl *tex*)
+  (gficl:delete-gl *quad*))
+
+(defun update ()
+  (gficl:with-update
+   ()))
+
+(defun render ()
+  (gficl:with-render
+   (gl:clear :color-buffer)
+   (gficl:bind-gl *shader*)
+   (gl:active-texture :texture0)
+   (gficl:bind-gl *tex*)
+   (gficl:draw-vertex-data *quad*)))
+
+(defun run ()
+  (gficl:with-window
+   (:title "font rendering" :width 600 :height 400 :resize-callback 'resize)
+   (setup)
+   (loop until (gficl:closed-p)
+	 do (update)
+	 do (render))
+   (cleanup)))

@@ -16,3 +16,7 @@
 	    (:use :cl)
 	    (:local-nicknames (#:obj #:org.shirakumo.fraf.wavefront))
 	    (:export #:run))
+
+(defpackage gficl-examples.font
+	    (:use :cl)
+	    (:export #:run))

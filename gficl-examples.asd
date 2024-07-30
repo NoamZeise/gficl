@@ -6,12 +6,15 @@
   :build-pathname "cube-wave"
   :entry-point "gficl-examples.cube-wave:run"
   :depends-on (:gficl
-	       ;; obj model loading
-	       :cl-wavefront)
+	       ;; for model loading example
+	       :cl-wavefront
+	       ;; for font loading example
+	       :truetype-clx)
   :components ((:module "examples"
 		:components
 		((:file "package")
 		 (:file "quad-spin")
 		 (:file "cube-wave")
 		 (:file "post-processing")
-		 (:file "model-loading")))))
+		 (:file "model-loading")
+		 (:file "font-rendering")))))
