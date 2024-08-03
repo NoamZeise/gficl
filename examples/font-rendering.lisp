@@ -1,9 +1,5 @@
 (in-package :gficl-examples.font)
 
-(defparameter *font-path* #p"examples/assets/Roboto-Regular.ttf")
-(defparameter *character-range* '(32 126))
-(defparameter *font-ht* nil)
-
 (defparameter *tex* nil)
 (defparameter *quad* nil)
 (defparameter *shader* nil)
@@ -37,11 +33,33 @@ void main() {
   colour = vec4(text_colour, text_alpha);
 }")
 
+(defparameter *font-path* #p"examples/assets/Roboto-Regular.ttf")
+(defparameter *character-range* '(32 126))
+(defparameter *font-size* 100)
+(defparameter *font-dpi* 500)
+(defparameter *font-ht* nil)
+
+(defclass character-info ()
+  ((data :initarg :data)
+   (tex-offset :initarg :offset :type gficl:vec)
+   (position :initarg :size :type gficl:vec)
+   (advance :initarg :bearing :type gficl:vec)))
+
 (defun setup ()
   (gl:clear-color 0 1 0 0)
   (gl:enable :blend)
   (gl:blend-func :src-alpha :one-minus-src-alpha)
   (setf *shader* (gficl:make-shader *vert-shader* *frag-shader*))
+  (setf *font-ht* nil)
+  (let ((tex-width 0) (tex-height 0))
+    (loop for i from (car *character-range*) to (cadr *character-range*) do
+	  (multiple-value-bind
+	   (data min-x max-y width height)
+	   (truetype-clx:text-pixarray *font-path* (string (code-char i))
+				       *font-size* *font-dpi* *font-dpi*)
+	   (format t "character : ~a is ~a , ~a x ~a , ~a    ~a~%" (code-char i)
+		   min-x width max-y height (if data (array-dimensions data) nil)))))
+  
   (loop for i from 65 to 65 do	
 	(let ((text (truetype-clx:text-pixarray *font-path* (string (code-char i)) 100 600 600)))
 	  (if text

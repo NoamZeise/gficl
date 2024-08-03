@@ -47,6 +47,7 @@
    #:shader-loc
 
    ;; vectors
+   #:vec
    #:make-vec
    #:vec-ref
    #:dot
@@ -59,6 +60,7 @@
    #:get-n-vec
 
    ;; quaternion
+   #:quat
    #:make-quat
    #:make-unit-quat
    #:*quat
@@ -68,6 +70,7 @@
    #:rotate-vec
    
    ;; matrices
+   #:matrix
    #:bind-matrix
    #:make-matrix
    #:make-matrix-from-data
