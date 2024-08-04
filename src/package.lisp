@@ -26,6 +26,7 @@
    #:make-vertex-slot
    #:make-vertex-form
    ;; vertex data
+   #:vertex-data
    #:make-vertex-data
    #:make-vertex-data-from-vectors
    #:draw-vertex-data
@@ -48,6 +49,7 @@
 
    ;; vectors
    #:vec
+   #:bind-vec
    #:make-vec
    #:vec-ref
    #:dot

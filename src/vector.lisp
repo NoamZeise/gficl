@@ -26,6 +26,7 @@
   (if (and (listp vec) (or (equalp (car vec) 'quote) (equalp (car vec) 'list)))
       `(make-vec ,vec) vec))
 
+(declaim (ftype (function (shader string vec)) internal-bind-vec))
 (defun internal-bind-vec (shader name vec)
   (let ((location (shader-loc shader name)))
     (ecase (dimension vec)
@@ -34,6 +35,9 @@
 	   (3 (%gl:uniform-3f location (vec-ref vec 0) (vec-ref vec 1) (vec-ref vec 2)))
 	   (4 (%gl:uniform-3f location
 			      (vec-ref vec 0) (vec-ref vec 1) (vec-ref vec 2) (vec-ref vec 3))))))
+
+(defmacro bind-vec (shader name vec)
+  `(internal-bind-vec ,shader ,name (make-vec-if-list ,vec)))
 
 (declaim (ftype (function (vec vec) number) dot))
 (defun dot (v1 v2)

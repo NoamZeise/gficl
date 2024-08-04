@@ -185,7 +185,7 @@ void main() {
     (gficl:bind-gl *main-shader*)
     (setf *position* (gficl:rotate-vec *position* (* dt 0.3) *world-up*))    
     (gficl:bind-matrix *main-shader* "view"
-		       (gficl:view-matrix *position* (gficl:-vec '(0 0 0) *position*) *world-up*))))
+		       (gficl:view-matrix *position* (gficl:-vec *position*) *world-up*))))
 
 (defun draw ()
   (gficl:with-render
