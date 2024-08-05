@@ -32,17 +32,20 @@
    #:draw-vertex-data
 
    ;; image
+   #:texture
    #:make-texture
    #:make-texture-with-fn
    #:get-image-format
 
    ;; framebuffer
+   #:framebuffer
    #:make-attachment-description
    #:make-framebuffer
    #:blit-framebuffers
    #:framebuffer-texture-id
 
    ;; shader
+   #:shader
    #:make-shader
    #:make-shader-from-path
    #:shader-loc
@@ -83,7 +86,7 @@
    #:cofactor-matrix
    #:determinant
    #:inverse-matrix
-   ;; handy matrices
+   ;; constructors for useful matrices
    #:scale-matrix
    #:translation-matrix
    #:2d-rotation-matrix
