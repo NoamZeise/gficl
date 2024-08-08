@@ -5,6 +5,11 @@
    (im :initarg :im :accessor im-quat :type vector))
   (:documentation "A quaternion with a real number and an imaginary VEC"))
 
+(defmethod print-object ((obj quaternion) out)
+  (print-unreadable-object
+   (obj out :type t)
+   (format out "~a + ~a" (slot-value obj 're) (slot-value obj 'im))))
+
 (declaim (ftype (function (number vec) (values quaternion &optional))
 		internal-make-quat
 		internal-make-unit-quat))
