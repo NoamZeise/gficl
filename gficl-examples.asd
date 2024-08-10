@@ -17,4 +17,5 @@
 		 (:file "cube-wave")
 		 (:file "post-processing")
 		 (:file "model-loading")
-		 (:file "font-rendering")))))
+		 (:file "font-rendering")
+		 (:file "shadows")))))

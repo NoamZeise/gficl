@@ -1,22 +1,21 @@
 #+linux (deploy:define-library cl-opengl-bindings::opengl :dont-deploy t)
 
-(defpackage gficl-examples.quad-spin
-	    (:use :cl)
-	    (:export #:run))
+(defmacro defexample (name &body body)
+  `(defpackage ,name
+	      (:use :cl)
+	      (:export #:run)
+	      ,@body))
 
-(defpackage gficl-examples.cube-wave
-	    (:use :cl)
-	    (:export #:run))
+(defexample gficl-examples.quad-spin)
 
-(defpackage gficl-examples.post-processing
-	    (:use :cl)
-	    (:export #:run))
+(defexample gficl-examples.cube-wave)
 
-(defpackage gficl-examples.model-loading
-	    (:use :cl)
-	    (:local-nicknames (#:obj #:org.shirakumo.fraf.wavefront))
-	    (:export #:run))
+(defexample gficl-examples.post-processing)
 
-(defpackage gficl-examples.font
-	    (:use :cl)
-	    (:export #:run))
+(defexample gficl-examples.model-loading
+	    (:local-nicknames (#:obj #:org.shirakumo.fraf.wavefront)))
+
+(defexample gficl-examples.font)
+
+(defexample gficl-examples.shadows
+	    (:local-nicknames (#:obj #:org.shirakumo.fraf.wavefront)))
