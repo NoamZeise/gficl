@@ -68,23 +68,28 @@
  	(error "Tried to get the attachment id of a non texture attachment"))))
 
 (declaim (ftype (function (t t integer integer &key
-			     (:buffer buffer-mask) (:filter texture-filter)))))
+			     (:buffer-list list) (:filter texture-filter)))
+		blit-framebuffers))
 (defun blit-framebuffers (read-fb draw-fb width height &key
-				  (buffer :color-buffer-bit) (filter :nearest))
+				  (buffer-list (list :color-buffer-bit)) (filter :nearest))
   "blit framebuffers with same width and height, pass 0 or nil for backbuffer"
+  (loop for b in buffer-list do
+	(assert (typep b 'buffer-mask) ()
+		"element ~a of buffer list is not a valid buffer mask: ~a"
+		b '(:colour-buffer-bit :depth-buffer-bit :stencil-buffer-bit)))
   (let ((read (if (or (equalp read-fb 0) (not read-fb)) 0
 		(progn (assert (typep read-fb 'framebuffer) ()
-			       "read-fb must be a framebuffer or nil")
+			       "read-fb must be a framebuffer (or nil)")
 		       (id read-fb))))
 	(draw (if (or (equalp draw-fb 0) (not draw-fb)) 0
 		(progn (assert (typep draw-fb 'framebuffer) ()
-			       "draw-fb must be a framebuffer or nil")
+			       "draw-fb must be a framebuffer (or nil)")
 		       (id draw-fb)))))
     (gl:bind-framebuffer :draw-framebuffer draw)
     (gl:bind-framebuffer :read-framebuffer read)
     (%gl:blit-framebuffer 0 0 width height
 			  0 0 width height
-			  buffer filter)))
+			  buffer-list filter)))
 
 (defmethod print-object ((obj framebuffer) out)
   (print-unreadable-object

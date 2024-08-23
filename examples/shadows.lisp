@@ -44,7 +44,7 @@ void main() {
   
   vec3 n = normalize(normal_vec);
   vec3 l = -vec3(0, 0.2, -1); // light direction
-  vec3 v = normalize(cam - pos);
+v  vec3 v = normalize(cam - pos);
 
   // gooch shading
   float t = (dot(n,l) + 1)/2.0;
