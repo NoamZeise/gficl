@@ -8,14 +8,14 @@
   "return whether key was just pressed down this frame"
   (and (key-down key) (not (key-present (render-prev-input *state*) key))))
 
-(defmacro map-keys-down (cases)
-  "Take a list of keys and expressions. ie. (map-keys ((:a (fn)) (:b (fn))))
+(defmacro map-keys-down (&body cases)
+  "Take a series of keys and expressions. ie. (map-keys (:a (fn) (:b (fn1 x) (fn2))
 runs any expressions which have their key down."
   `(progn ,@(loop for c in cases collecting `(if (key-down ,(car c)) (progn ,@(cdr c))))))
 
-(defmacro map-keys-pressed (cases)
-  "Take a list of keys and expressions. ie. (map-keys ((:a (fn)) (:b (fn))))
-runs any expressions which have their key pressed."
+(defmacro map-keys-pressed (&body cases)
+  "Take a series of keys and expressions. ie. (map-keys (:a (fn)) (:b (fn1 x) (fn2)))
+runs any expressions which have their key pressed (key down this frame, key up last frame)."
   `(progn ,@(loop for c in cases collecting `(if (key-pressed ,(car c)) (progn ,@(cdr c))))))
 
 

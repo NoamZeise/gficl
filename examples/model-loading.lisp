@@ -125,20 +125,20 @@ void main() {
   (gficl:with-update (dt)
     
     (gficl:map-keys-pressed
-     ((:escape (glfw:set-window-should-close))
-      (:f (gficl:toggle-fullscreen))))
+     (:escape (glfw:set-window-should-close))
+     (:f (gficl:toggle-fullscreen)))
     
     (gficl:map-keys-down
-     ((:up (setf *position*   (gficl:+vec *position* (gficl:*vec (*  0.2 dt) *forward*))))	
-      (:down (setf *position* (gficl:+vec *position* (gficl:*vec (* -0.2 dt) *forward*))))
-      (:space
-       (setf *position*
-	     (gficl:+vec *position*
-			 (gficl:*vec (* 0.3 dt (gficl:magnitude *forward*)) *world-up*))))
-      (:left-shift
-       (setf *position*
-	     (gficl:+vec *position*
-			 (gficl:*vec (* -0.3 dt (gficl:magnitude *forward*)) *world-up*))))))      
+     (:up (setf *position*   (gficl:+vec *position* (gficl:*vec (*  0.2 dt) *forward*))))	
+     (:down (setf *position* (gficl:+vec *position* (gficl:*vec (* -0.2 dt) *forward*))))
+     (:space
+      (setf *position*
+	    (gficl:+vec *position*
+			(gficl:*vec (* 0.3 dt (gficl:magnitude *forward*)) *world-up*))))
+     (:left-shift
+      (setf *position*
+	    (gficl:+vec *position*
+			(gficl:*vec (* -0.3 dt (gficl:magnitude *forward*)) *world-up*)))))      
     (update-view dt)))
 
 (defun draw ()

@@ -97,8 +97,8 @@ void main() {
   (gficl:delete-gl *quad*))
 
 (defun update ()
-  (gficl:with-update
-   ()))
+  (gficl:with-update ()
+    (gficl:map-keys-down (:escape (glfw:set-window-should-close)))))
 
 (defun render ()
   (gficl:with-render

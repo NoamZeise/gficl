@@ -44,7 +44,7 @@ void main() {
   
   vec3 n = normalize(normal_vec);
   vec3 l = -vec3(0, 0.2, -1); // light direction
-v  vec3 v = normalize(cam - pos);
+  vec3 v = normalize(cam - pos);
 
   // gooch shading
   float t = (dot(n,l) + 1)/2.0;
@@ -125,20 +125,20 @@ v  vec3 v = normalize(cam - pos);
   (gficl:with-update (dt)
     
     (gficl:map-keys-pressed
-     ((:escape (glfw:set-window-should-close))
-      (:f (gficl:toggle-fullscreen))))
+     (:escape (glfw:set-window-should-close))
+     (:f (gficl:toggle-fullscreen)))
     
     (gficl:map-keys-down
-     ((:up (setf *position*   (gficl:+vec *position* (gficl:*vec (*  0.2 dt) *forward*))))	
-      (:down (setf *position* (gficl:+vec *position* (gficl:*vec (* -0.2 dt) *forward*))))
-      (:space
-       (setf *position*
-	     (gficl:+vec *position*
-			 (gficl:*vec (* 0.3 dt (gficl:magnitude *forward*)) *world-up*))))
-      (:left-shift
-       (setf *position*
-	     (gficl:+vec *position*
-			 (gficl:*vec (* -0.3 dt (gficl:magnitude *forward*)) *world-up*))))))      
+     (:up (setf *position*   (gficl:+vec *position* (gficl:*vec (*  0.2 dt) *forward*))))	
+     (:down (setf *position* (gficl:+vec *position* (gficl:*vec (* -0.2 dt) *forward*))))
+     (:space
+      (setf *position*
+	    (gficl:+vec *position*
+			(gficl:*vec (* 0.3 dt (gficl:magnitude *forward*)) *world-up*))))
+     (:left-shift
+      (setf *position*
+	    (gficl:+vec *position*
+			(gficl:*vec (* -0.3 dt (gficl:magnitude *forward*)) *world-up*)))))      
     (update-view dt)))
 
 (defun draw ()

@@ -180,8 +180,8 @@ void main() {
 (defun update ()
   (gficl:with-update (dt)
     (gficl:map-keys-pressed
-     ((:escape (glfw:set-window-should-close))
-      (:f (gficl:toggle-fullscreen))))
+     (:escape (glfw:set-window-should-close))
+     (:f (gficl:toggle-fullscreen)))
     (gficl:bind-gl *main-shader*)
     (setf *position* (gficl:rotate-vec *position* (* dt 0.3) *world-up*))    
     (gficl:bind-matrix *main-shader* "view"
