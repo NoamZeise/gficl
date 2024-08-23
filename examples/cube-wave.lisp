@@ -46,7 +46,7 @@ void main() {
  localpos = vec3(model * vec4(vertex, 1));
  int x = 2 * (gl_InstanceID / dim) - dim;
  int y = 2 * (gl_InstanceID % dim) - dim;
- pos = vec3(x, height(x, y), y) + localpos;
+ pos = vec3(x*0.98, height(x, y), y*0.98) + localpos;
  gl_Position = projection * view * vec4(pos, 1);}")
 
 (defparameter *main-frag-code*
@@ -58,7 +58,8 @@ out vec4 colour;
 void main() {
   colour = vec4(localpos.y * 0.2 - 0.45);
   colour += vec4(sin(0.05*pos.x), 2*sin(0.02*pos.y), sin(0.05*pos.z), 1);
-  colour *= sinh(localpos.x - localpos.z)*0.04 + 1;}")
+  colour *= sinh(localpos.x - localpos.z)*0.04 + 0.9;
+}")
 
 (defparameter *cube* nil)
 (defparameter *fb* nil)
