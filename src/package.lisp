@@ -23,6 +23,7 @@
    #:delete-gl
 
    ;; vertex data description
+   #:vertex-form
    #:make-vertex-slot
    #:make-vertex-form
    ;; vertex data

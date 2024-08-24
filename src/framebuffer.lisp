@@ -70,7 +70,7 @@
 (declaim (ftype (function (t t integer integer &key
 			     (:buffer-list list) (:filter texture-filter)))
 		blit-framebuffers))
-(defun blit-framebuffers (read-fb draw-fb width height &key
+(defun blit-framebuffers (read-fb draw-fb width height &key	
 				  (buffer-list (list :color-buffer-bit)) (filter :nearest))
   "blit framebuffers with same width and height, pass 0 or nil for backbuffer"
   (loop for b in buffer-list do

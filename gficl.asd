@@ -21,3 +21,11 @@
 		 (:file "framebuffer" :depends-on ("types" "image"))
 		 (:file "image" :depends-on ("types"))
 		 (:file "vertex" :depends-on ("types"))))))
+
+(defsystem :gficl/load
+  :depends-on (:gficl
+	       :cl-wavefront)
+  :components ((:module "src/load"
+		:components
+		((:file "package")
+		 (:file "model")))))

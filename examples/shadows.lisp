@@ -1,6 +1,16 @@
 (in-package :gficl-examples.shadows)
 
 (defparameter *bunny-path* #p"examples/assets/bunny.obj")
+(defparameter *cube-path* #p"examples/assets/cube.obj")
+
+(defparameter *plane-data*
+	      (list :verts
+		    '(((-1 0 -1) (0 1 0))
+		      ((1 0 -1) (0 1 0))
+		      ((1 0 1) (0 1 0))
+		      ((-1 0 1) (0 1 0)))
+		    :indices
+		    '(0 3 2 2 1 0)))
 
 (defparameter *vertex-data-form*
 	      (gficl:make-vertex-form
@@ -62,7 +72,11 @@ void main() {
   colour = vec4(shaded*edge, 1);
 }")
 
+
 (defparameter *bunny* nil)
+(defparameter *plane* nil)
+(defparameter *cube* nil)
+
 (defparameter *fb* nil)
 (defparameter *main-shader* nil)
 
@@ -72,28 +86,53 @@ void main() {
 (defparameter *forward* nil)
 (defparameter *position* nil)
 (defparameter *target* nil)
-(defparameter *world-up* nil)
+(defparameter *world-up* (gficl:make-vec '(0 1 0)))
+
+(defclass render-obj ()
+  ((vertex-data :initarg :vertex-data :accessor vertex-data :type gficl:vertex-data)
+   (model-mat :accessor model-mat :type gficl:matrix :initform (gficl:make-matrix))
+   (normal-mat :accessor normal-mat :type gficl:matrix :initform (gficl:make-matrix))))
+
+(defun set-model-mat (ro model-mat)
+  (setf (slot-value ro 'model-mat) model-mat)
+  (setf (slot-value ro 'normal-mat) (gficl:transpose-matrix (gficl:inverse-matrix model-mat))))
+
+(defun make-render-obj (vertex-data model-mat)
+  (let ((ro (make-instance 'render-obj :vertex-data vertex-data)))
+    (set-model-mat ro model-mat) ro))
+
+(defun draw-render-obj (ro)
+  (gficl:bind-matrix *main-shader* "model" (model-mat ro))
+  (gficl:bind-matrix *main-shader* "normal_mat" (normal-mat ro))
+  (gficl:draw-vertex-data (vertex-data ro)))
 
 (defun setup ()
-  (let* ((bunny-mesh (car (obj:extract-meshes (obj:parse (probe-file *bunny-path*))))))
-    (setf *bunny* (gficl:make-vertex-data-from-vectors
-		   *vertex-data-form*
-		   (obj:vertex-data bunny-mesh)
-		   (obj:index-data bunny-mesh))))
+  (setf *bunny* (make-render-obj
+		 (car (gficl/load:model *bunny-path* :vertex-form '(:position :normal)))
+		 (gficl:*mat
+		  (gficl:translation-matrix '(-1.5 0 -1))
+		  (gficl:scale-matrix '(3 3 3)))))
+  (setf *cube* (make-render-obj
+		(car (gficl/load:model *cube-path* :vertex-form '(:position :normal)))
+		(gficl:*mat
+		 (gficl:translation-matrix '(2 0 1))
+		 (gficl:scale-matrix '(1 1.5 1)))))
+  (setf *plane* (make-render-obj
+		 (gficl:make-vertex-data
+		  *vertex-data-form*
+		  (getf *plane-data* :verts) (getf *plane-data* :indices))
+		 (gficl:*mat
+		  (gficl:translation-matrix '(0 -1.15 0))
+		  (gficl:scale-matrix '(7 1 7)))))
+  
   (setf *main-shader* (gficl:make-shader *main-vert-code* *main-frag-code*))
   (gl:clear-color 0.8 0.5 0 0)
   (gficl:bind-gl *main-shader*)
-  (let ((mat (gficl:scale-matrix '(5 5 5))))
-    (gficl:bind-matrix *main-shader* "model" mat)
-    (gficl:bind-matrix *main-shader* "normal_mat"
-		       (gficl:transpose-matrix
-			(gficl:inverse-matrix mat))))
   
   (setf *fb* nil)
   (resize (gficl:window-width) (gficl:window-height))
   (setf *view* (gficl:make-matrix))
 
-  (setf *world-up* (gficl:make-vec '(0 1 0)))
   (setf *position* (gficl:make-vec'(5 1 5)))
   (setf *target* (gficl:make-vec '(0 0 0)))
   (update-view 0)
@@ -111,7 +150,9 @@ void main() {
 	      w h (min 4 (gl:get-integer :max-samples)))))
 
 (defun cleanup ()
-  (gficl:delete-gl *bunny*)
+  (gficl:delete-gl (vertex-data *bunny*))
+  (gficl:delete-gl (vertex-data *cube*))
+  (gficl:delete-gl (vertex-data *plane*))
   (gficl:delete-gl *main-shader*)
   (gficl:delete-gl *fb*))
 
@@ -148,7 +189,9 @@ void main() {
    (gficl:bind-gl *main-shader*)
    (gficl:bind-matrix *main-shader* "view" *view*)
    (gficl::internal-bind-vec *main-shader* "cam" *position*)
-   (gficl:draw-vertex-data *bunny*)
+   (draw-render-obj *bunny*)
+   (draw-render-obj *plane*)
+   (draw-render-obj *cube*)
    (gficl:blit-framebuffers *fb* 0 (gficl:window-width) (gficl:window-height))))
 
 (defun run ()

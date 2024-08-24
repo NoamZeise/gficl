@@ -6,27 +6,60 @@
 	 '(member :float :double :int :unsigned-int :short :unsigned-short))
 
 (defclass vertex-slot ()
-  ((vector-size :initarg :vector-size :accessor vector-size :type integer)
-   (element-type :initarg :element-type :accessor element-type :type vertex-elem-type)))
+  ((index :initarg :index :accessor index :type integer)
+   (vector-size :initarg :vector-size :accessor vector-size :type integer)
+   (element-type :initarg :element-type :accessor element-type :type vertex-elem-type)
+   (slot-active :initarg :slot-active :accessor slot-active :type boolean)))
 
-(declaim (ftype (function (integer vertex-elem-type) vertex-slot) make-vertex-slot))
-(defun make-vertex-slot (vector-size element-type)
-  "define an element of a vertex in a shader. ie position, normal, texcoords, etc."
-  (make-instance 'vertex-slot :vector-size vector-size :element-type element-type))
+(defmethod print-object ((obj vertex-slot) out)
+   (print-unreadable-object
+    (obj out :type t)
+    (format out "index ~a active ~a (~a ~a)"
+	    (index obj) (slot-active obj) (vector-size obj) (element-type obj))))
+
+(declaim (ftype (function (integer vertex-elem-type
+				   &key (:vertex-slot-index integer)
+				   (:slot-active boolean))
+			  (values vertex-slot &optional))
+		make-vertex-slot))
+(defun make-vertex-slot (vector-size element-type &key
+				     (vertex-slot-index -1)
+				     (slot-active t))
+  "define an element of a vertex in a shader. ie position, normal, texcoords, etc.
+VECTOR-SIZE is how many spaces this slot is (ie 3 floats, 2 ints etc...)
+VERTEX-ELEM-TYPE is the type of the element (ie float int short, etc...)
+If VERTEX-SLOT-INDEX is negative, it will take as it's index the position in the list
+of VERTEX-SLOTs passed to MAKE-VERTEX-FORM.
+SLOT-ACTIVE indicates whether the shader uses this slot or not. "
+  (make-instance 'vertex-slot
+		 :vector-size vector-size
+		 :element-type element-type
+		 :index vertex-slot-index
+		 :slot-active slot-active))
 
 (defclass vertex-form ()
   ((vertex-slots :initarg :vertex-slots :accessor vertex-slots)
    (slot-offsets :initarg :slot-offsets :accessor slot-offsets)
    (vertex-mem-size :initarg :vertex-mem-size :accessor vertex-mem-size)))
 
+(defmethod print-object ((obj vertex-form) out)
+   (print-unreadable-object
+    (obj out :type t)
+    (format out "size: ~a offsets: ~a~%slots: ~a"
+	    (vertex-mem-size obj) (slot-offsets obj) (vertex-slots obj))))
+
 (defun make-vertex-form (vertex-slots)
-  "define a vertex shader input based on the supplied vertex slots.
-The order must match the vertex locations in the shader"
+  "Define a vertex shader input based on the supplied vertex slots.
+For any slots with undefined indices the order must match the vertex locations in the shader"
   (let* ((slot-offsets (list))
 	 (vertex-mem-size 0))
+    (loop for i from 0 for slot in vertex-slots do
+	  (progn (assert (typep slot 'vertex-slot))
+		 (if (< (index slot) 0)
+		     (setf (index slot) i))))
+    (setf vertex-slots (sort vertex-slots #'(lambda (a b) (< (index a) (index b)))))
     (loop for slot in vertex-slots
 	  do (progn
-	       (assert (typep slot 'vertex-slot))
 	       (push vertex-mem-size slot-offsets)
 	       (let ((slot-size
 		      (* (vector-size slot) (cffi:foreign-type-size (element-type slot)))))
@@ -148,11 +181,15 @@ Move vertex data vertex by vertex and check that the form matches the vertex for
   offset)
 
 (defun setup-vertex-attrib-array (vertex-form)
-  (loop for i from 0
-	for slot in (vertex-slots vertex-form)
-	for offset in (slot-offsets vertex-form) do
+  (loop for slot in (vertex-slots vertex-form)
+	for offset in (slot-offsets vertex-form)
+	when (slot-active slot) do
 	(progn
-	  (gl:enable-vertex-attrib-array i)
+	  (gl:enable-vertex-attrib-array (index slot))
 	  (gl:vertex-attrib-pointer
-	   i (vector-size slot) (element-type slot) nil
-	   (vertex-mem-size vertex-form) (cffi:make-pointer offset)))))
+	   (index slot)
+	   (vector-size slot)
+	   (element-type slot)
+	   nil
+	   (vertex-mem-size vertex-form)
+	   (cffi:make-pointer offset)))))
