@@ -16,7 +16,15 @@ The vertex form is a list of VERTEX-ELEMENT (ie :position, :normal, :uv, or :ski
 
 (defun get-vertex-form (mesh form)
   (gficl:make-vertex-form
-   (loop for a in (obj:attributes mesh) collecting
-	 (ecase a (:position (gficl:make-vertex-slot 3 :float))
-		(:normal (gficl:make-vertex-slot 3 :float))
-		(:uv (gficl:make-vertex-slot 2 :float))))))
+   (loop for i from 0 for a in (obj:attributes mesh) collecting
+	 (destructuring-bind (type size)
+			     (ecase a
+				    (:position '(:float 3))
+				    (:normal '(:float 3))
+				    (:uv '(:float 2)))
+			     (let ((pos (position a form)))
+			       (gficl:make-vertex-slot
+				size type
+				:vertex-slot-index (if pos pos -1)
+				:data-offset-index i
+				:slot-active (if pos t nil)))))))

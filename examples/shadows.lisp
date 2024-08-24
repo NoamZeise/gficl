@@ -2,6 +2,7 @@
 
 (defparameter *bunny-path* #p"examples/assets/bunny.obj")
 (defparameter *cube-path* #p"examples/assets/cube.obj")
+(defparameter *sphere-path* #p"examples/assets/sphere.obj")
 
 (defparameter *plane-data*
 	      (list :verts
@@ -19,7 +20,7 @@
 
 (defparameter *main-vert-code*
 	      "#version 330
-layout (location = 0) in vec3 vertex;
+layout (location = 0) in vec3 position;
 layout (location = 1) in vec3 normal;
 
 out vec3 pos;
@@ -31,7 +32,7 @@ uniform mat4 view;
 uniform mat4 projection;
 
 void main() {
- vec4 world_pos = model * vec4(vertex, 1);
+ vec4 world_pos = model * vec4(position, 1);
  pos = vec3(world_pos);
  normal_vec = vec3(normal_mat * vec4(normal, 1));
  gl_Position = projection * view * world_pos;}")
@@ -76,6 +77,7 @@ void main() {
 (defparameter *bunny* nil)
 (defparameter *plane* nil)
 (defparameter *cube* nil)
+(defparameter *sphere* nil)
 
 (defparameter *fb* nil)
 (defparameter *main-shader* nil)
@@ -106,17 +108,25 @@ void main() {
   (gficl:bind-matrix *main-shader* "normal_mat" (normal-mat ro))
   (gficl:draw-vertex-data (vertex-data ro)))
 
+(defun load-model (path)
+  (car (gficl/load:model path :vertex-form '(:position :normal))))
+
 (defun setup ()
   (setf *bunny* (make-render-obj
-		 (car (gficl/load:model *bunny-path* :vertex-form '(:position :normal)))
+		 (load-model *bunny-path*)
 		 (gficl:*mat
-		  (gficl:translation-matrix '(-1.5 0 -1))
+		  (gficl:translation-matrix '(-1.5 0 -2))
 		  (gficl:scale-matrix '(3 3 3)))))
   (setf *cube* (make-render-obj
-		(car (gficl/load:model *cube-path* :vertex-form '(:position :normal)))
+		(load-model *cube-path*)
 		(gficl:*mat
-		 (gficl:translation-matrix '(2 0 1))
+		 (gficl:translation-matrix '(2 -1 1))
 		 (gficl:scale-matrix '(1 1.5 1)))))
+  (setf *sphere* (make-render-obj
+		  (load-model *sphere-path*)
+		  (gficl:*mat
+		   (gficl:translation-matrix '(-2 1 1.5))
+		   (gficl:scale-matrix '(1 1 1)))))
   (setf *plane* (make-render-obj
 		 (gficl:make-vertex-data
 		  *vertex-data-form*
@@ -152,6 +162,7 @@ void main() {
 (defun cleanup ()
   (gficl:delete-gl (vertex-data *bunny*))
   (gficl:delete-gl (vertex-data *cube*))
+  (gficl:delete-gl (vertex-data *sphere*))
   (gficl:delete-gl (vertex-data *plane*))
   (gficl:delete-gl *main-shader*)
   (gficl:delete-gl *fb*))
@@ -190,8 +201,9 @@ void main() {
    (gficl:bind-matrix *main-shader* "view" *view*)
    (gficl::internal-bind-vec *main-shader* "cam" *position*)
    (draw-render-obj *bunny*)
-   (draw-render-obj *plane*)
    (draw-render-obj *cube*)
+   (draw-render-obj *sphere*)
+   (draw-render-obj *plane*)
    (gficl:blit-framebuffers *fb* 0 (gficl:window-width) (gficl:window-height))))
 
 (defun run ()

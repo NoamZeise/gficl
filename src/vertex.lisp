@@ -7,6 +7,7 @@
 
 (defclass vertex-slot ()
   ((index :initarg :index :accessor index :type integer)
+   (data-index :initarg :data-index :accessor data-index :type integer)
    (vector-size :initarg :vector-size :accessor vector-size :type integer)
    (element-type :initarg :element-type :accessor element-type :type vertex-elem-type)
    (slot-active :initarg :slot-active :accessor slot-active :type boolean)))
@@ -14,27 +15,36 @@
 (defmethod print-object ((obj vertex-slot) out)
    (print-unreadable-object
     (obj out :type t)
-    (format out "index ~a active ~a (~a ~a)"
-	    (index obj) (slot-active obj) (vector-size obj) (element-type obj))))
+    (format out "index ~a data-index: ~a active ~a (~a ~a)"
+	    (index obj) (data-index obj) (slot-active obj) (vector-size obj) (element-type obj))))
 
 (declaim (ftype (function (integer vertex-elem-type
 				   &key (:vertex-slot-index integer)
+				   (:data-offset-index integer)
 				   (:slot-active boolean))
 			  (values vertex-slot &optional))
 		make-vertex-slot))
 (defun make-vertex-slot (vector-size element-type &key
 				     (vertex-slot-index -1)
+				     (data-offset-index -1)
 				     (slot-active t))
   "define an element of a vertex in a shader. ie position, normal, texcoords, etc.
 VECTOR-SIZE is how many spaces this slot is (ie 3 floats, 2 ints etc...)
 VERTEX-ELEM-TYPE is the type of the element (ie float int short, etc...)
-If VERTEX-SLOT-INDEX is negative, it will take as it's index the position in the list
+
+VERTEX-SLOT-INDEX is the location of the slot in the shader input.
+If it is negative, it will take as it's index the position in the list
 of VERTEX-SLOTs passed to MAKE-VERTEX-FORM.
+
+DATA-OFFSET-INDEX is the location of the vertex slots in the vertex data,
+If it is negative it will be the same as VERTEX-SLOT-INDEX.
+
 SLOT-ACTIVE indicates whether the shader uses this slot or not. "
   (make-instance 'vertex-slot
 		 :vector-size vector-size
 		 :element-type element-type
 		 :index vertex-slot-index
+		 :data-index data-offset-index
 		 :slot-active slot-active))
 
 (defclass vertex-form ()
@@ -56,8 +66,10 @@ For any slots with undefined indices the order must match the vertex locations i
     (loop for i from 0 for slot in vertex-slots do
 	  (progn (assert (typep slot 'vertex-slot))
 		 (if (< (index slot) 0)
-		     (setf (index slot) i))))
-    (setf vertex-slots (sort vertex-slots #'(lambda (a b) (< (index a) (index b)))))
+		     (setf (index slot) i))
+		 (if (< (data-index slot) 0)
+		     (setf (data-index slot) (index slot)))))
+    (setf vertex-slots (sort vertex-slots #'(lambda (a b) (< (data-index a) (data-index b)))))
     (loop for slot in vertex-slots
 	  do (progn
 	       (push vertex-mem-size slot-offsets)
