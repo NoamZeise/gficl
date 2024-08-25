@@ -119,7 +119,7 @@ void main() {
   (setf *fixed-target* t)
   (setf *resolve-fb* nil)
   (setf *offscreen-fb* nil)
-  (setf *samples* (min 8 (gl:get-integer :max-samples)))  
+  (setf *samples* (min 8 (gl:get-integer :max-samples)))
   (setf *main-shader* (gficl:make-shader *main-vert* *main-frag*))
   (gficl:bind-gl *main-shader*)
   (gficl:bind-matrix *main-shader* "model" (gficl:make-matrix))

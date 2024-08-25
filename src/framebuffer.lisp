@@ -43,6 +43,12 @@
   "defines the form an attachment to a framebuffer should take"
   (make-instance 'attachment-description :pos position :type type))
 
+(defmethod print-object ((obj attachment-description) out)
+  (print-unreadable-object
+   (obj out :type t)
+   (format out "~a ~a"
+	   (attachment-position obj) (attachment-type obj))))
+
 ;; --- framebuffer ---
 
 (deftype draw-buffer ()
@@ -140,34 +146,57 @@ If :draw-buffers is not supplied, draw buffers will be all of the passed colour 
    (type :initarg :res-type :accessor attachment-type :type attachment-type)
    (resource :initarg :res :accessor resource :type gl-object)))
 
-(declaim (ftype (function (attachment-position attachment-type integer integer integer)
+(declaim (ftype (function (attachment-position attachment-type integer integer integer
+					       &key (:internal-format t))
 			  (values attachment &optional))
 		make-attachment))
-(defun make-attachment (position resource-type width height samples)
-  "Create attachment resource. Either a texture or a renderbuffer."
+(defun make-attachment (position resource-type width height samples
+				 &key (internal-format nil))
+  "Create attachment resource. Either a texture or a renderbuffer.
+A suitable image format will be selected automatically if :internal-format is NIL."
   (assert (and (> width 0) (> height 0) (> samples 0)))
-  (let* ((format (ecase position
-		   (:color-attachment0 :rgb)
-		   (:depth-stencil-attachment :depth24-stencil8)))
+  (let* ((colour-attachment (color-attachment-p position))
+	 (attachment-type (if colour-attachment :color position))
+	 (format (ecase attachment-type
+			(:color :rgb)
+			(:depth-stencil-attachment :depth-stencil)
+			(:depth-attachment :depth-component)
+			(:stencil-attachment :depth-stencil)))
+	 (internal-format (if internal-format internal-format format))
+	 (data-type (ecase attachment-type
+			   (:color :unsigned-byte)
+			   (:depth-stencil-attachment :unsigned-int-24-8)
+			   (:depth-attachment :float)
+			   (:stencil-attachment :unsigned-int-24-8)))
 	 (res (ecase resource-type
-		(:texture
-		 (make-texture width height :format format :samples samples :wrap :clamp-to-border))
-		(:renderbuffer
-		 (make-renderbuffer format width height samples)))))
+		     (:texture
+		      (make-texture width height
+				    :format format
+				    :internal-format internal-format
+				    :samples samples
+				    :wrap :clamp-to-border
+				    :data-type data-type))
+		     (:renderbuffer
+		      (make-renderbuffer internal-format width height samples)))))
+    (if (equalp resource-type :texture)
+	(case attachment-type
+	      ((:depth-stencil-attachment :depth-attachment :stencil-attachment)
+	       ;; disable depth comparison - TODO make this optional
+	       (gl:tex-parameter :texture-2d :texture-compare-mode :none))))
     (make-instance 'attachment :position position :res res :res-type resource-type)))
 
 (declaim (ftype (function (attachment)) attach-to-framebuffer))
 (defun attach-to-framebuffer (attachment)
   (bind-gl (resource attachment))
   (ecase (attachment-type attachment)	 
-	 (:texture (gl:framebuffer-texture-2d :framebuffer
-					      (attachment-position attachment) 
-					      (tex-type (resource attachment))
-					      (id (resource attachment)) 0))
-	 (:renderbuffer (gl:framebuffer-renderbuffer :framebuffer
-						     (attachment-position attachment)
-						     :renderbuffer
-						     (id (resource attachment))))))
+	 (:texture (gl:framebuffer-texture-2d
+		    :framebuffer
+		    (attachment-position attachment) 
+		    (tex-type (resource attachment))
+		    (id (resource attachment)) 0))
+	 (:renderbuffer (gl:framebuffer-renderbuffer
+			 :framebuffer (attachment-position attachment)
+			 :renderbuffer (id (resource attachment))))))
 
 (defmethod id ((obj attachment))
   (id (resource obj)))

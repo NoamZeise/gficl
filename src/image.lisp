@@ -1,6 +1,16 @@
 (in-package :gficl)
 
-(deftype image-format () '(member :red :rg :rgb :rgba :depth24-stencil8))
+(deftype colour-image-format () '(member :red :rg :rgb :rgba))
+(deftype image-format ()
+	 '(or colour-image-format
+	      (member :depth-component :depth-stencil)))
+(deftype internal-image-format ()
+	 '(or image-format
+	      (member :depth24-stencil8
+		      :depth32f-stencil8
+		      :depth-component16
+		      :depth-component24
+		      :depth-component32f)))
 
 (declaim (ftype (function (integer) image-format) get-image-format))
 (defun get-image-format (channels)
@@ -27,38 +37,50 @@
 
 (declaim (ftype (function (integer integer &key
 				   (:format image-format)
+				   (:internal-format t)
 				   (:samples integer)
 				   (:data cffi:foreign-pointer)
 				   (:mipmapping boolean)
 				   (:wrap texture-wrap)
-				   (:filter texture-filter))
+				   (:filter texture-filter)
+				   (:data-type t))
 			  (values texture &optional))
 		make-texture))
 (defun make-texture
     (width height &key
 	   (format :rgba)
+	   (internal-format nil)
 	   (samples 1)
 	   (data (cffi:null-pointer))
 	   (mipmapping nil)
 	   (wrap :repeat)
-	   (filter :nearest))
+	   (filter :nearest)
+	   (data-type :unsigned-byte))
   (declare (integer width) (integer height) (integer samples))
   "Make a texture, must be freed with DELETE-GL.
 Data should be null or a pointer to texture data 
 with enough bytes to create the texture, one byte for each channel.
 (no. bytes = width * height * channels)
-If samples > 1, a multisample texture will be created which does not use the data argument."
+If samples > 1, a multisample texture will be created which does not use the data argument.
+If internal format is nil, it will match format. 
+This will work for colour textures, 
+but internal format must be speicifed for depth-stencil textures"
   (assert (and (> width 0) (> height 0) (> samples 0)) (width height samples)
 	  "Width (~d) Height (~d) Samples (~d) must all be greater than 0"
 	  width height samples)
+  (if internal-format (assert (typep internal-format 'internal-image-format))
+    (if (typep internal-format 'colour-image-format)
+	(setf internal-format format)
+      (error "Missing :internal-format
+When making non-colour textures, :format and :internal-format must be supplied.")))
   (let ((id (gl:gen-texture))
 	(type (if (> samples 1) :texture-2d-multisample :texture-2d)))
     (gl:bind-texture type id)
     (if (or (equalp format :red) (equalp format :rgb))
 	(gl:pixel-store :unpack-alignment 1))
     (if (equal type :texture-2d-multisample)
-	(%gl:tex-image-2d-multisample type samples format width height :false)
-      (gl:tex-image-2d type 0 format width height 0 format :unsigned-byte data))
+	(%gl:tex-image-2d-multisample type samples internal-format width height :false)
+      (gl:tex-image-2d type 0 internal-format width height 0 format data-type data))
     (if mipmapping (gl:generate-mipmap id))
     (if (equal type :texture-2d)
 	(progn (gl:tex-parameter type :texture-wrap-s wrap)
@@ -120,7 +142,7 @@ If samples > 1, a multisample texture will be created which does not use the dat
 (defclass renderbuffer (gl-object)
   ((samples :initarg :samples :accessor rb-samples)))
 
-(declaim (ftype (function (image-format integer integer integer)
+(declaim (ftype (function (internal-image-format integer integer integer)
 			  (values renderbuffer &optional))
 		make-renderbuffer))
 (defun make-renderbuffer (format width height samples)

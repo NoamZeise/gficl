@@ -85,6 +85,28 @@ void main() {
 #version 330
 void main() {}")
 
+(defparameter *post-vert*
+  "#version 330
+out vec2 uv;
+uniform mat4 transform;
+void main() {
+  uv = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+  gl_Position = transform * vec4(uv * 2.0f - 1.0f, 0.0f, 1.0f);}")
+(defparameter *post-frag*
+  "#version 330
+in vec2 uv;
+out vec4 colour;
+uniform sampler2D tex;
+void main() { 
+  if(uv.x > 1 || uv.y > 1 || uv.x < 0 || uv.y < 0) discard;
+  float d = texture(tex, uv).r;
+  const float NEAR = 0.1;
+  const float FAR = 10;
+  d = (2 * NEAR) / (FAR + NEAR - d * (FAR - NEAR));
+  
+  colour = vec4(vec3(d), 1);
+}")
+
 (defparameter *bunny* nil)
 (defparameter *plane* nil)
 (defparameter *cube* nil)
@@ -95,10 +117,12 @@ void main() {}")
 (defparameter *shadow-fb* nil)
 (defparameter *shadow-shader* nil)
 
-(defparameter *view* nil)
+(defparameter *debug-shader* nil)
+(defparameter *dummy-vert* nil)
 
 (defconstant +max-samples+ 8)
 
+(defparameter *view* nil)
 ;; camera
 (defparameter *forward* nil)
 (defparameter *position* nil)
@@ -131,33 +155,47 @@ void main() {}")
   (car (gficl/load:model path :vertex-form '(:position :normal))))
 
 (defun setup ()  
-  (setf *bunny* (make-render-obj
-		 (load-model *bunny-path*)
-		 (gficl:*mat
-		  (gficl:translation-matrix '(-1.5 0 -2))
-		  (gficl:scale-matrix '(3 3 3)))))
-  (setf *cube* (make-render-obj
-		(load-model *cube-path*)
-		(gficl:*mat
-		 (gficl:translation-matrix '(2 -1 1))
-		 (gficl:scale-matrix '(1 1.5 1)))))
-  (setf *sphere* (make-render-obj
-		  (load-model *sphere-path*)
-		  (gficl:*mat
-		   (gficl:translation-matrix '(-2 1 1.5))
-		   (gficl:scale-matrix '(1 1 1)))))
-  (setf *plane* (make-render-obj
-		 (gficl:make-vertex-data
-		  *vertex-data-form*
-		  (getf *plane-data* :verts) (getf *plane-data* :indices))
-		 (gficl:*mat
-		  (gficl:translation-matrix '(0 -1.15 0))
-		  (gficl:scale-matrix '(7 1 7)))))
+  (setf *bunny*
+	(make-render-obj
+	 (load-model *bunny-path*)
+	 (gficl:*mat
+	  (gficl:translation-matrix '(-1.5 0 -2))
+	  (gficl:scale-matrix '(3 3 3)))))
+  (setf *cube*
+	(make-render-obj
+	 (load-model *cube-path*)
+	 (gficl:*mat
+	  (gficl:translation-matrix '(2 -1 1))
+	  (gficl:scale-matrix '(1 1.5 1)))))
+  (setf *sphere*
+	(make-render-obj
+	 (load-model *sphere-path*)
+	 (gficl:translation-matrix '(-2 1 1.5))))
+  (setf *plane*
+	(make-render-obj
+	 (gficl:make-vertex-data
+	  *vertex-data-form*
+	  (getf *plane-data* :verts) (getf *plane-data* :indices))
+	 (gficl:*mat
+	  (gficl:translation-matrix '(0 -1.15 0))
+	  (gficl:scale-matrix '(7 1 7)))))
+
+  (setf *dummy-vert*
+	(gficl:make-vertex-data (gficl:make-vertex-form (list (gficl:make-vertex-slot 1 :int)))
+				'(((0))) '(0 0 0)))
   
   (setf *main-shader* (gficl:make-shader *main-vert-code* *main-frag-code*))
   (setf *shadow-shader* (gficl:make-shader *shadow-vert* *shadow-frag*))
-  (gficl:bind-gl *main-shader*)
   
+  (setf *debug-shader* (gficl:make-shader *post-vert* *post-frag*))
+  (gficl:bind-gl *debug-shader*)
+  (gl:uniformi (gficl:shader-loc *debug-shader* "tex") 0)
+  (gficl:bind-matrix *debug-shader* "transform"
+		     (gficl:*mat
+		      (gficl:translation-matrix '(0.7 0.7 0))
+		      (gficl:scale-matrix '(0.3 0.3 0))))
+
+  (gficl:bind-gl *main-shader*)  
   (setf *fb* nil)
   (setf *shadow-fb* nil)
   (resize (gficl:window-width) (gficl:window-height))
@@ -185,8 +223,7 @@ void main() {}")
     (if *shadow-fb* (gficl:delete-gl *shadow-fb*))
     (setf *shadow-fb*
 	  (gficl:make-framebuffer
-	   (list (gficl:make-attachment-description :depth-stencil-attachment :texture))
-	   w h :samples samples))))
+	   (list (gficl:make-attachment-description :depth-attachment :texture)) w h))))
 
 (defun cleanup ()
   (gficl:delete-gl (vertex-data *bunny*))
@@ -195,6 +232,10 @@ void main() {}")
   (gficl:delete-gl (vertex-data *plane*))
   (gficl:delete-gl *main-shader*)
   (gficl:delete-gl *shadow-shader*)
+
+  (gficl:delete-gl *debug-shader*)
+  (gficl:delete-gl *dummy-vert*)
+  
   (gficl:delete-gl *fb*)
   (gficl:delete-gl *shadow-fb*))
 
@@ -226,17 +267,32 @@ void main() {}")
 
 (defun draw ()
   (gficl:with-render
+
+   ;; depth map render
    (gficl:bind-gl *shadow-fb*)
+   (gl:disable :multisample)
    (gl:clear :depth-buffer)
    (gficl:bind-gl *shadow-shader*)
+   (gficl:bind-matrix *shadow-shader* "view" *view*)
    (draw-render-obj-shadow *bunny*)
    (draw-render-obj-shadow *cube*)
    (draw-render-obj-shadow *sphere*)
    (draw-render-obj-shadow *plane*)
-   
+
+   ;; main render
    (gficl:bind-gl *fb*)
+   (gl:enable :multisample)
    (gl:clear :color-buffer :depth-buffer)
+   
+   (gficl:bind-gl *debug-shader*)
+   (gl:disable :cull-face)
+   (gl:active-texture :texture0)
+   (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *shadow-fb* 0))
+   (gficl:bind-gl *dummy-vert*)
+   (gl:draw-arrays :triangles 0 3)
+   
    (gficl:bind-gl *main-shader*)
+   (gl:enable :cull-face)
    (gficl:bind-matrix *main-shader* "view" *view*)
    (gficl:bind-vec *main-shader* "cam" *position*)
    (draw-render-obj *bunny*)
