@@ -164,7 +164,7 @@ void main() {
 	 (list (gficl:make-attachment-description :color-attachment0
 						  (if *resolve-fb* :renderbuffer :texture))
 	       (gficl:make-attachment-description :depth-stencil-attachment))
-	 w h *samples*))
+	 w h :samples *samples*))
   (gficl:bind-gl *main-shader*)
   (gficl:bind-matrix *main-shader* "projection"
 		     (gficl:screen-perspective-matrix w h 1 0.1)))

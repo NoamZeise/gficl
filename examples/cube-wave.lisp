@@ -105,7 +105,7 @@ void main() {
   (setf *fb* (gficl:make-framebuffer
 	      (list (gficl:make-attachment-description :color-attachment0)
 		    (gficl:make-attachment-description :depth-stencil-attachment))
-	      w h (min 4 (gl:get-integer :max-samples)))))
+	      w h :samples (min 4 (gl:get-integer :max-samples)))))
 
 (defun cleanup ()
   (gficl:delete-gl *cube*)

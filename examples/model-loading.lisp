@@ -108,7 +108,7 @@ void main() {
   (setf *fb* (gficl:make-framebuffer
 	      (list (gficl:make-attachment-description :color-attachment0)
 		    (gficl:make-attachment-description :depth-stencil-attachment))
-	      w h (min 4 (gl:get-integer :max-samples)))))
+	      w h :samples (min 4 (gl:get-integer :max-samples)))))
 
 (defun cleanup ()
   (gficl:delete-gl *bunny*)
@@ -147,7 +147,7 @@ void main() {
    (gl:clear :color-buffer :depth-buffer)
    (gficl:bind-gl *main-shader*)
    (gficl:bind-matrix *main-shader* "view" *view*)
-   (gficl::internal-bind-vec *main-shader* "cam" *position*)
+   (gficl:bind-vec *main-shader* "cam" *position*)
    (gficl:draw-vertex-data *bunny*)
    (gficl:blit-framebuffers *fb* 0 (gficl:window-width) (gficl:window-height))))
 

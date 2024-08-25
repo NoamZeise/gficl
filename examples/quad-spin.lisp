@@ -87,7 +87,7 @@ void main() {
 
 (defun resize (w h)
   (if *fb* (gficl:delete-gl *fb*))
-  (setf *fb* (gficl:make-framebuffer *fb-attachments* w h *samples*))
+  (setf *fb* (gficl:make-framebuffer *fb-attachments* w h :samples *samples*))
   (setf *bg-model* (gficl:scale-matrix (list w h 1)))
   (setf *projection* (gficl:screen-orthographic-matrix
     (gficl:window-width) (gficl:window-height))))

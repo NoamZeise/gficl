@@ -2,8 +2,33 @@
 
 ;; --- framebuffer attachment ---
 
+(defun color-attachment-p (position)
+  (let ((n
+	 (handler-case
+	     (parse-integer
+	      (handler-case 
+		  (subseq (string position) 16)
+		(error () "-1")))
+	   (error () -1)))
+	(max-attachments
+	 (cffi:with-foreign-object (p :int)
+	   ;; opengl does not change the supplied pointer
+	   ;; to get-xxx functions if it hasn't been loaded yet
+	   ;; so have some sane default for type checking before
+	   ;; ogl is loaded			   
+           (setf (cffi:mem-aref p :int) 16)
+	   (%gl:get-integer-v :max-color-attachments p)
+	   (cffi:mem-aref p :int))))
+    (and (>= n 0)
+	 (<= n max-attachments))))
+
 (deftype attachment-position ()
-	 '(member :color-attachment0 :depth-stencil-attachment))
+	 '(or
+	   (member
+	    :depth-stencil-attachment
+	    :depth-attachment
+	    :stencil-attachment)
+	   (satisfies color-attachment-p)))
 
 (deftype attachment-type () '(member :texture :renderbuffer))
 
@@ -20,15 +45,23 @@
 
 ;; --- framebuffer ---
 
+(deftype draw-buffer ()
+	 '(or (member :none :front-left :front-right :back-left :back-right)
+	      (satisfies color-attachment-p)))
+
 (defclass framebuffer (gl-object)
   ((attachments :initarg :attachments :accessor attachments)))
 
-(declaim (ftype (function (list integer integer &optional integer) (values framebuffer &optional))
+(declaim (ftype (function (list integer integer &key (:samples integer) (:draw-buffers list))
+			  (values framebuffer &optional))
 		make-framebuffer))
-(defun make-framebuffer (attachments width height &optional (samples 1))
-  "creates a framebuffer from a list of attachment descriptions"
+(defun make-framebuffer (attachments width height
+				     &key (samples 1) (draw-buffers () draw-buffers-supplied))
+  "creates a framebuffer from a list of attachment descriptions.
+:draw-buffers is a list of DRAW-BUFFER items.
+If :draw-buffers is not supplied, draw buffers will be all of the passed colour attachments."
   (let ((id (gl:gen-framebuffer))
-	(draw-buffers ())
+	(draw-buffer-list draw-buffers)
 	(internal-attachments
 	 (loop for desc in attachments collecting
 	       (progn (assert (typep desc 'attachment-description) (desc)
@@ -37,11 +70,14 @@
 				       (attachment-type desc)
 				       width height samples)))))
     (gl:bind-framebuffer :framebuffer id)
-    (setf draw-buffers (loop for attachment in internal-attachments do
+    (setf draw-buffer-list (loop for attachment in internal-attachments do
 			     (attach-to-framebuffer attachment)
-			     when (equalp (attachment-type attachment) :texture)
+			     when (and (not draw-buffers-supplied)
+				       (color-attachment-p (attachment-position attachment)))
 			     collect (attachment-position attachment)))
-    (if draw-buffers (gl:draw-buffers draw-buffers))
+    (case draw-buffer-list
+	  (t (loop for e in draw-buffer-list do (assert (typep e 'draw-buffer)))
+	     (gl:draw-buffers draw-buffer-list)))
     (let ((status (gl:check-framebuffer-status :framebuffer)))
       (unless (gl::enum= status :framebuffer-complete)
 	(error "Failed to create framebuffer, gl error: ~a" status)))
@@ -69,7 +105,7 @@
 
 (declaim (ftype (function (t t integer integer &key
 			     (:buffer-list list) (:filter texture-filter)))
-		blit-framebuffers))
+		blit-framebuffers))	
 (defun blit-framebuffers (read-fb draw-fb width height &key	
 				  (buffer-list (list :color-buffer-bit)) (filter :nearest))
   "blit framebuffers with same width and height, pass 0 or nil for backbuffer"

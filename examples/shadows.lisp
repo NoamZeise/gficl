@@ -5,13 +5,11 @@
 (defparameter *sphere-path* #p"examples/assets/sphere.obj")
 
 (defparameter *plane-data*
-	      (list :verts
-		    '(((-1 0 -1) (0 1 0))
-		      ((1 0 -1) (0 1 0))
-		      ((1 0 1) (0 1 0))
-		      ((-1 0 1) (0 1 0)))
-		    :indices
-		    '(0 3 2 2 1 0)))
+	      (list :verts '(((-1 0 -1) (0 1 0))
+			     ((1 0 -1) (0 1 0))
+			     ((1 0 1) (0 1 0))
+			     ((-1 0 1) (0 1 0)))
+		    :indices '(0 3 2 2 1 0)))
 
 (defparameter *vertex-data-form*
 	      (gficl:make-vertex-form
@@ -73,6 +71,19 @@ void main() {
   colour = vec4(shaded*edge, 1);
 }")
 
+(defparameter *shadow-vert* "
+#version 330
+layout (location = 0) in vec3 position;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+void main() {
+ gl_Position = projection * view * model * vec4(position, 1);}")
+(defparameter *shadow-frag* "
+#version 330
+void main() {}")
 
 (defparameter *bunny* nil)
 (defparameter *plane* nil)
@@ -81,8 +92,12 @@ void main() {
 
 (defparameter *fb* nil)
 (defparameter *main-shader* nil)
+(defparameter *shadow-fb* nil)
+(defparameter *shadow-shader* nil)
 
 (defparameter *view* nil)
+
+(defconstant +max-samples+ 8)
 
 ;; camera
 (defparameter *forward* nil)
@@ -108,10 +123,14 @@ void main() {
   (gficl:bind-matrix *main-shader* "normal_mat" (normal-mat ro))
   (gficl:draw-vertex-data (vertex-data ro)))
 
+(defun draw-render-obj-shadow (ro)
+  (gficl:bind-matrix *shadow-shader* "model" (model-mat ro))
+  (gficl:draw-vertex-data (vertex-data ro)))
+
 (defun load-model (path)
   (car (gficl/load:model path :vertex-form '(:position :normal))))
 
-(defun setup ()
+(defun setup ()  
   (setf *bunny* (make-render-obj
 		 (load-model *bunny-path*)
 		 (gficl:*mat
@@ -136,28 +155,38 @@ void main() {
 		  (gficl:scale-matrix '(7 1 7)))))
   
   (setf *main-shader* (gficl:make-shader *main-vert-code* *main-frag-code*))
-  (gl:clear-color 0.8 0.5 0 0)
+  (setf *shadow-shader* (gficl:make-shader *shadow-vert* *shadow-frag*))
   (gficl:bind-gl *main-shader*)
   
   (setf *fb* nil)
+  (setf *shadow-fb* nil)
   (resize (gficl:window-width) (gficl:window-height))
   (setf *view* (gficl:make-matrix))
 
   (setf *position* (gficl:make-vec'(5 1 5)))
   (setf *target* (gficl:make-vec '(0 0 0)))
   (update-view 0)
+  (gl:clear-color 0.8 0.5 0 0)
   (gl:enable :cull-face :depth-test :multisample)
   (gl:cull-face :front))
 
 (defun resize (w h)
-  (gficl:bind-gl *main-shader*)
-  (gficl:bind-matrix *main-shader* "projection"
-    (gficl::screen-perspective-matrix w h (* pi 0.4) 0.1))
-  (if *fb* (gficl:delete-gl *fb*))
-  (setf *fb* (gficl:make-framebuffer
-	      (list (gficl:make-attachment-description :color-attachment0)
-		    (gficl:make-attachment-description :depth-stencil-attachment))
-	      w h (min 4 (gl:get-integer :max-samples)))))
+  (let ((proj (gficl::screen-perspective-matrix w h (* pi 0.4) 0.1)))
+    (gficl:bind-gl *main-shader*)
+    (gficl:bind-matrix *main-shader* "projection" proj)
+    (gficl:bind-gl *shadow-shader*)
+    (gficl:bind-matrix *shadow-shader* "projection" proj))
+  (let ((samples (min +max-samples+ (gl:get-integer :max-samples))))
+    (if *fb* (gficl:delete-gl *fb*))
+    (setf *fb* (gficl:make-framebuffer
+		(list (gficl:make-attachment-description :color-attachment0)
+		      (gficl:make-attachment-description :depth-stencil-attachment))
+		w h :samples samples))
+    (if *shadow-fb* (gficl:delete-gl *shadow-fb*))
+    (setf *shadow-fb*
+	  (gficl:make-framebuffer
+	   (list (gficl:make-attachment-description :depth-stencil-attachment :texture))
+	   w h :samples samples))))
 
 (defun cleanup ()
   (gficl:delete-gl (vertex-data *bunny*))
@@ -165,7 +194,9 @@ void main() {
   (gficl:delete-gl (vertex-data *sphere*))
   (gficl:delete-gl (vertex-data *plane*))
   (gficl:delete-gl *main-shader*)
-  (gficl:delete-gl *fb*))
+  (gficl:delete-gl *shadow-shader*)
+  (gficl:delete-gl *fb*)
+  (gficl:delete-gl *shadow-fb*))
 
 (defun update-view (dt)
   (setf *position*
@@ -195,11 +226,19 @@ void main() {
 
 (defun draw ()
   (gficl:with-render
+   (gficl:bind-gl *shadow-fb*)
+   (gl:clear :depth-buffer)
+   (gficl:bind-gl *shadow-shader*)
+   (draw-render-obj-shadow *bunny*)
+   (draw-render-obj-shadow *cube*)
+   (draw-render-obj-shadow *sphere*)
+   (draw-render-obj-shadow *plane*)
+   
    (gficl:bind-gl *fb*)
    (gl:clear :color-buffer :depth-buffer)
    (gficl:bind-gl *main-shader*)
    (gficl:bind-matrix *main-shader* "view" *view*)
-   (gficl::internal-bind-vec *main-shader* "cam" *position*)
+   (gficl:bind-vec *main-shader* "cam" *position*)
    (draw-render-obj *bunny*)
    (draw-render-obj *cube*)
    (draw-render-obj *sphere*)
