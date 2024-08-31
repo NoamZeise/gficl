@@ -1,21 +1,19 @@
 #+linux (deploy:define-library cl-opengl-bindings::opengl :dont-deploy t)
 
 (defmacro defexample (name &body body)
-  `(defpackage ,name
+  `(defpackage ,(make-symbol
+		 (concatenate 'string
+			      (symbol-name 'gficl-examples/)
+			      (symbol-name name)))
 	      (:use :cl)
 	      (:export #:run)
 	      ,@body))
 
-(defexample gficl-examples.quad-spin)
-
-(defexample gficl-examples.cube-wave)
-
-(defexample gficl-examples.post-processing)
-
-(defexample gficl-examples.model-loading
+(defexample quad-spin)
+(defexample cube-wave)
+(defexample post-processing)
+(defexample model-loading
 	    (:local-nicknames (#:obj #:org.shirakumo.fraf.wavefront)))
-
-(defexample gficl-examples.font)
-
-(defexample gficl-examples.shadows
+(defexample font)
+(defexample shadows
 	    (:local-nicknames (#:obj #:org.shirakumo.fraf.wavefront)))

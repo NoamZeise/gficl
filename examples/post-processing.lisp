@@ -1,4 +1,4 @@
-(in-package :gficl-examples.post-processing)
+(in-package :gficl-examples/post-processing)
 
 (defparameter *main-vert*
   "#version 330

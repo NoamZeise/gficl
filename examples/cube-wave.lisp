@@ -1,4 +1,4 @@
-(in-package :gficl-examples.cube-wave)
+(in-package :gficl-examples/cube-wave)
 
 (defparameter *cube-data*
   (list :verts
@@ -100,7 +100,7 @@ void main() {
 (defun resize (w h)
   (gficl:bind-gl *main-shader*)
   (gficl:bind-matrix *main-shader* "projection"
-    (gficl::screen-perspective-matrix w h (* pi 0.4) 0.1))
+    (gficl:screen-perspective-matrix w h (* pi 0.4) 0.1))
   (if *fb* (gficl:delete-gl *fb*))
   (setf *fb* (gficl:make-framebuffer
 	      (list (gficl:make-attachment-description :color-attachment0)
@@ -116,7 +116,7 @@ void main() {
   (setf *position*
 	(gficl:quat-conjugate-vec (gficl:make-unit-quat (* 0.1 dt) *world-up*) *position*))
   (setf *forward* (gficl:-vec *target* *position*))
-  (setf *view* (gficl::view-matrix *position* *forward* *world-up*)))
+  (setf *view* (gficl:view-matrix *position* *forward* *world-up*)))
 
 (defun update ()
   (gficl:with-update (dt)

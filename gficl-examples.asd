@@ -4,7 +4,7 @@
   :defsystem-depends-on (:deploy)
   :build-operation "deploy-op"
   :build-pathname "cube-wave"
-  :entry-point "gficl-examples.cube-wave:run"
+  :entry-point "gficl-examples/cube-wave:run"
   :depends-on (:gficl
 	       ;; for model loading examples
 	       :gficl/load

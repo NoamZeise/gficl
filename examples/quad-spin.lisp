@@ -1,4 +1,4 @@
-(in-package :gficl-examples.quad-spin)
+(in-package :gficl-examples/quad-spin)
 
 (defparameter *samples* 1)
 

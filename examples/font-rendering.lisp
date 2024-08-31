@@ -1,4 +1,4 @@
-(in-package :gficl-examples.font)
+(in-package :gficl-examples/font)
 
 (defparameter *tex* nil)
 (defparameter *quad* nil)
