@@ -34,14 +34,18 @@
 
 (defclass attachment-description ()
   ((pos :initarg :pos :accessor attachment-position :type attachment-position)
-   (type :initarg :type :accessor attachment-type :type attachment-type)))
+   (type :initarg :type :accessor attachment-type :type attachment-type)
+   (texture-wrap :initarg :wrap :accessor attachment-wrap :type texture-wrap)))
 
-(declaim (ftype (function (attachment-position &optional attachment-type)
+(declaim (ftype (function (attachment-position &key
+					       (:type attachment-type)
+					       (:wrap texture-wrap))
 			  (values attachment-description &optional))
 		make-attachment-description))
-(defun make-attachment-description (position &optional (type :renderbuffer))
+(defun make-attachment-description (position &key (type :renderbuffer)
+					     (wrap :clamp-to-edge))
   "defines the form an attachment to a framebuffer should take"
-  (make-instance 'attachment-description :pos position :type type))
+  (make-instance 'attachment-description :pos position :type type :wrap wrap))
 
 (defmethod print-object ((obj attachment-description) out)
   (print-unreadable-object
@@ -72,9 +76,7 @@ If :draw-buffers is not supplied, draw buffers will be all of the passed colour 
 	 (loop for desc in attachments collecting
 	       (progn (assert (typep desc 'attachment-description) (desc)
 			      "~a was not an ATTACHMENT-DESCRIPTION" desc)
-		      (make-attachment (attachment-position desc)
-				       (attachment-type desc)
-				       width height samples)))))
+		      (make-attachment desc width height samples)))))
     (gl:bind-framebuffer :framebuffer id)
     (setf draw-buffer-list (loop for attachment in internal-attachments do
 			     (attach-to-framebuffer attachment)
@@ -146,15 +148,17 @@ If :draw-buffers is not supplied, draw buffers will be all of the passed colour 
    (type :initarg :res-type :accessor attachment-type :type attachment-type)
    (resource :initarg :res :accessor resource :type gl-object)))
 
-(declaim (ftype (function (attachment-position attachment-type integer integer integer)
+(declaim (ftype (function (attachment-description integer integer integer)
 			  (values attachment &optional))
 		make-attachment))
-(defun make-attachment (position resource-type width height samples)
+(defun make-attachment (desc width height samples)
   "Create attachment resource. Either a texture or a renderbuffer.
 A suitable image format will be selected automatically if :internal-format is NIL."
   (assert (and (> width 0) (> height 0) (> samples 0)))
-  (let* ((colour-attachment (color-attachment-p position))
-	 (attachment-type (if colour-attachment :color position))
+  (let* ((pos (attachment-position desc))
+	 (resource-type (attachment-type desc))
+	 (colour-attachment (color-attachment-p pos))
+	 (attachment-type (if colour-attachment :color pos))
 	 (format (ecase attachment-type
 			(:color :rgb)			
 			(:depth-attachment :depth-component)
@@ -165,22 +169,23 @@ A suitable image format will be selected automatically if :internal-format is NI
 			   (:depth-stencil-attachment :unsigned-int-24-8)
 			   (:depth-attachment :float)
 			   (:stencil-attachment :unsigned-int-24-8)))
+	 (filter (case attachment-type
+		       ((:depth-stencil-attachment :depth-attachment)
+			;; depth comparison - TODO make this optional
+			:linear)
+		       (otherwise :nearest)))
 	 (res (ecase resource-type
 		     (:texture
 		      (make-texture width height
 				    :format format
 				    :internal-format internal-format
 				    :samples samples
-				    :wrap :clamp-to-border
-				    :data-type data-type))
+				    :wrap (attachment-wrap desc)
+				    :data-type data-type
+				    :filter filter))
 		     (:renderbuffer
 		      (make-renderbuffer internal-format width height samples)))))
-    (if (equalp resource-type :texture)
-	(case attachment-type
-	      ((:depth-stencil-attachment :depth-attachment :stencil-attachment)
-	       ;; depth comparison - TODO make this optional
-	       (gl:tex-parameter :texture-2d :texture-compare-mode :compare-ref-to-texture))))
-    (make-instance 'attachment :position position :res res :res-type resource-type)))
+    (make-instance 'attachment :position pos :res res :res-type resource-type)))
 
 (declaim (ftype (function (attachment)) attach-to-framebuffer))
 (defun attach-to-framebuffer (attachment)

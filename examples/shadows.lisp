@@ -11,17 +11,13 @@
 			     ((-1 0 1) (0 1 0)))
 		    :indices '(0 3 2 2 1 0)))
 
-(defparameter *vertex-data-form*
-	      (gficl:make-vertex-form
-	       (list (gficl:make-vertex-slot 3 :float)
-		     (gficl:make-vertex-slot 3 :float))))
-
 (defparameter *main-vert-code*
 	      "#version 330
 layout (location = 0) in vec3 position;
 layout (location = 1) in vec3 normal;
 
 out vec3 pos;
+out vec4 shadow_world_pos;
 out vec3 normal_vec;
 
 uniform mat4 model;
@@ -29,53 +25,76 @@ uniform mat4 normal_mat;
 uniform mat4 view;
 uniform mat4 projection;
 
+uniform mat4 light_view_proj;
+
 void main() {
  vec4 world_pos = model * vec4(position, 1);
  pos = vec3(world_pos);
+ shadow_world_pos = (light_view_proj * vec4(pos, 1));
  normal_vec = vec3(normal_mat * vec4(normal, 1));
  gl_Position = projection * view * world_pos;}")
 
 (defparameter *main-frag-code*
   "#version 330
 in vec3 pos;
+in vec4 shadow_world_pos;
 in vec3 normal_vec;
 out vec4 colour;
 
 uniform vec3 cam;
 uniform int shaded;
-uniform sampler2D shadow;
 
-void main() {
-  if(shaded == 0) {
-     colour = vec4(1);
-     return;
-  }
+uniform vec3 light_pos;
+uniform sampler2DShadow shadow;
+uniform float bias_factor;
 
+float in_shadow(vec3 n, vec3 l) {
+  vec4 shadow_pos = shadow_world_pos;
+  shadow_pos /= shadow_pos.w;
+  shadow_pos += vec4(1);
+  shadow_pos /= 2;
+  float bias = 0.000001 * bias_factor
+             + 0.00005  * bias_factor * (1.0 - dot(n, -l));
+  shadow_pos.z -= bias;
+  return texture(shadow, shadow_pos.xyz); 
+}
+
+vec3 gooch(vec3 n, vec3 l, vec3 v, float in_shadow) {
   // shading constants
   vec3 object_colour = vec3(1);
   vec3 cool = vec3(0.2, 0, 0.55) + 0.25*object_colour;
   vec3 warm = vec3(0.5, 0.3, 0) + 0.5*object_colour;
   vec3 highlight = vec3(1, 0.8, 0.2);
   float specular = 30.0f;
-  
-  vec3 n = normalize(normal_vec);
-  vec3 l = -vec3(0, 0.2, -1); // light direction
-  vec3 v = normalize(cam - pos);
 
-  // gooch shading
   float t = (dot(n,l) + 1)/2.0;
   vec3 r = -reflect(l,n);
-  float s = clamp(pow(dot(r,v), specular), 0, 1);
-  vec3 base = mix(cool, warm,  t);
-  vec3 shaded = mix(base, highlight, s);
-  
-  // edge outline
-  float edge_amount = dot(n, v);
-  float thickness = 0.23;
-  edge_amount = clamp(edge_amount, 0, thickness)*(1/thickness);
-  vec3 edge = vec3(edge_amount);
+  float s = clamp(pow(max(dot(r, v), 0), specular), 0, 1);
+  vec3 base = mix(cool, warm,  t - 0.2*t*(1 - in_shadow));
+  return mix(base, highlight, s*in_shadow);
+}
 
-  colour = vec4(shaded*edge, 1);
+vec3 edge_highlight(vec3 n, vec3 v) {
+  float thickness = 0.23;
+  float edge_amount = dot(n, v);
+  edge_amount = clamp(edge_amount, 0, thickness)*(1/thickness);
+  return vec3(edge_amount);
+}
+
+void main() {
+  if(shaded == 0) {
+     colour = vec4(1);
+     return;
+  }
+ 
+  // lighting vecs
+  vec3 n = normalize(normal_vec);
+  vec3 l = normalize(light_pos - pos);
+  vec3 v = normalize(cam - pos);
+
+  float in_shadow = in_shadow(n, l);
+  vec3 obj_colour = gooch(n, l, v, in_shadow) * edge_highlight(n, v);
+  colour = vec4(obj_colour, 1);
 }")
 
 (defparameter *shadow-vert* "
@@ -104,17 +123,18 @@ void main() {
 in vec2 uv;
 out vec4 colour;
 uniform sampler2D tex;
+uniform float near;
+uniform float far;
 void main() { 
   if(uv.x > 1 || uv.y > 1 || uv.x < 0 || uv.y < 0) discard;
   float d = texture(tex, uv).r;
-  const float NEAR = 0.1;
-  const float FAR = 10;
-  d = (2 * NEAR) / (FAR + NEAR - d * (FAR - NEAR));
+  d = (2 * near) / (far + near - d * (far - near));
   
   colour = vec4(vec3(d), 1);
 }")
 
 (defconstant +max-samples+ 8)
+(defconstant +shadow-map-size+ 1000)
 
 (defparameter *bunny* nil)
 (defparameter *plane* nil)
@@ -137,11 +157,14 @@ void main() {
 (defparameter *view* nil)
 (defparameter *world-up* (gficl:make-vec '(0 1 0)))
 
+(defparameter *cam-move* nil)
+
 ;; light
+(defparameter *light-ortho-mode* nil)
 (defparameter *light-ro* nil)
-(defparameter *light-pos* (gficl:make-vec '(7 4 6)))
-(defparameter *light-dir* (gficl:make-vec '(-1 -1.9 -1)))
-(defparameter *light-view* (gficl:view-matrix *light-pos* *light-dir* *world-up*))
+(defparameter *light-pos* nil)
+(defparameter *light-view* nil)
+(defparameter *light-proj* nil)
 
 (defclass render-obj ()
   ((vertex-data :initarg :vertex-data :accessor vertex-data :type gficl:vertex-data)
@@ -168,7 +191,10 @@ void main() {
 (defun load-model (path)
   (car (gficl/load:model path :vertex-form '(:position :normal))))
 
-(defun setup ()  
+(defun setup ()
+  (setf *light-pos* (gficl:make-vec '(10 9 10)))
+  (setf *cam-move* t)
+  (setf *light-ortho-mode* nil)
   (setf *bunny*
 	(make-render-obj
 	 (load-model *bunny-path*)
@@ -187,7 +213,9 @@ void main() {
   (setf *plane*
 	(make-render-obj
 	 (gficl:make-vertex-data
-	  *vertex-data-form*
+	  (gficl:make-vertex-form
+	   (list (gficl:make-vertex-slot 3 :float)
+		 (gficl:make-vertex-slot 3 :float)))
 	  (getf *plane-data* :verts) (getf *plane-data* :indices))
 	 (gficl:*mat
 	  (gficl:translation-matrix '(0 -1.15 0))
@@ -209,36 +237,57 @@ void main() {
 		      (gficl:scale-matrix '(0.3 0.3 0))))
 
   (gficl:bind-gl *main-shader*)
-  ;;(gl:uniformi (gficl:shader-loc *debug-shader* "shadow") 0)
+  (gl:uniformi (gficl:shader-loc *main-shader* "shadow") 0)
   (setf *fb* nil)
-  (setf *shadow-fb* nil)
   (resize (gficl:window-width) (gficl:window-height))
+  
+  (if *shadow-fb* (gficl:delete-gl *shadow-fb*))
+  (setf *shadow-fb*
+	(gficl:make-framebuffer
+	 (list (gficl:make-attachment-description :depth-attachment :type :texture))
+	 +shadow-map-size+ +shadow-map-size+))
+  (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *shadow-fb* 0))
+  (gl:tex-parameter :texture-2d :texture-compare-mode :compare-ref-to-texture)
+  (toggle-light-mode)
+  (update-light-pos)
+  
   (setf *view* (gficl:make-matrix))
-
   (setf *position* (gficl:make-vec'(5 1 5)))
   (setf *target* (gficl:make-vec '(0 0 0)))
-  (update-view 0)
-  (gl:clear-color 0.8 0.5 0 0)
-  (gl:enable :cull-face :depth-test :multisample)
-  (gl:cull-face :front))
+  (update-view 0))
+
+(defun set-light-projection (proj far-max bias)
+  (setf *light-proj* proj)
+  
+  (gficl:bind-gl *shadow-shader*)
+  (gficl:bind-matrix *shadow-shader* "projection" *light-proj*)
+  
+  (gficl:bind-gl *debug-shader*)
+  (gl:uniformf (gficl:shader-loc *debug-shader* "near") 1)
+  (gl:uniformf (gficl:shader-loc *debug-shader* "far") far-max)
+  
+  (gficl:bind-gl *main-shader*)
+  (gl:uniformf (gficl:shader-loc *main-shader* "bias_factor") bias)
+  (update-light-vp))
+
+(defun toggle-light-mode ()
+  (setf *light-ortho-mode* (not *light-ortho-mode*))
+  (if *light-ortho-mode*
+      (set-light-projection (gficl:orthographic-matrix 10 -10 -10 10 80 -80) 5 20)
+    (set-light-projection
+     (let* ((near 0.5) (edge (* near (tan (/ pi 6.0)))))
+       (gficl:perspective-matrix edge (- edge) (- edge) edge near))
+     50 1)))
 
 (defun resize (w h)
   (gficl:bind-gl *main-shader*)
   (gficl:bind-matrix *main-shader* "projection"
 		     (gficl:screen-perspective-matrix w h (* pi 0.4) 0.1))
-  (gficl:bind-gl *shadow-shader*)
-  (gficl:bind-matrix *shadow-shader* "projection"
-		     (gficl:screen-perspective-matrix w h (* pi 0.5) 0.1))
-  (let ((samples (min +max-samples+ (gl:get-integer :max-samples))))
-    (if *fb* (gficl:delete-gl *fb*))
-    (setf *fb* (gficl:make-framebuffer
-		(list (gficl:make-attachment-description :color-attachment0)
-		      (gficl:make-attachment-description :depth-stencil-attachment))
-		w h :samples samples))
-    (if *shadow-fb* (gficl:delete-gl *shadow-fb*))
-    (setf *shadow-fb*
-	  (gficl:make-framebuffer
-	   (list (gficl:make-attachment-description :depth-attachment :texture)) w h))))
+  (if *fb* (gficl:delete-gl *fb*))
+  (setf *fb* (gficl:make-framebuffer
+	      (list (gficl:make-attachment-description :color-attachment0)
+		    (gficl:make-attachment-description :depth-stencil-attachment))
+	      w h :samples (min +max-samples+ (gl:get-integer :max-samples)))))
 
 (defun cleanup ()
   (gficl:delete-gl (vertex-data *bunny*))
@@ -254,18 +303,41 @@ void main() {
   (gficl:delete-gl *fb*)
   (gficl:delete-gl *shadow-fb*))
 
+(defun update-light-vp ()
+  (gficl:bind-gl *main-shader*)
+  (gficl:bind-matrix *main-shader* "light_view_proj" (gficl:*mat *light-proj* *light-view*)))
+
+(defun update-light-pos ()
+  (setf *light-view* (gficl:view-matrix *light-pos* (gficl:-vec '(0 -4 0) *light-pos*) *world-up*))
+  (update-light-vp)
+  (gficl:bind-vec *main-shader* "light_pos" *light-pos*))
+
+(defun light-controls (dt)
+  (let ((speed (* 10 dt)))
+    (gficl:map-keys-down
+     (:w (setf *light-pos* (gficl:+vec *light-pos* (list speed 0 0))))
+     (:s (setf *light-pos* (gficl:+vec *light-pos* (list (* -1 speed) 0 0))))
+     (:a (setf *light-pos* (gficl:+vec *light-pos* (list 0 0 speed))))
+     (:d (setf *light-pos* (gficl:+vec *light-pos* (list 0 0 (* -1 speed)))))))
+  (gficl:map-keys-pressed
+   (:z (toggle-light-mode)))
+  (update-light-pos))
+
 (defun update-view (dt)
-  (setf *position*
-	(gficl:quat-conjugate-vec (gficl:make-unit-quat (* 0.1 dt) *world-up*) *position*))
+  (if *cam-move*
+      (setf *position*
+	    (gficl:quat-conjugate-vec (gficl:make-unit-quat (* 0.1 dt) *world-up*) *position*)))
   (setf *forward* (gficl:-vec *target* *position*))
-  (setf *view* (gficl:view-matrix *position* *forward* *world-up*)))
+  (setf *view* (gficl:view-matrix *position* *forward* *world-up*))
+  (set-model-mat *light-ro* (gficl:translation-matrix *light-pos*)))
 
 (defun update ()
   (gficl:with-update (dt)
     
     (gficl:map-keys-pressed
      (:escape (glfw:set-window-should-close))
-     (:f (gficl:toggle-fullscreen)))
+     (:f (gficl:toggle-fullscreen))
+     (:x (setf *cam-move* (not *cam-move*))))
     
     (gficl:map-keys-down
      (:up (setf *position*   (gficl:+vec *position* (gficl:*vec (*  0.2 dt) *forward*))))	
@@ -277,7 +349,8 @@ void main() {
      (:left-shift
       (setf *position*
 	    (gficl:+vec *position*
-			(gficl:*vec (* -0.3 dt (gficl:magnitude *forward*)) *world-up*)))))      
+			(gficl:*vec (* -0.3 dt (gficl:magnitude *forward*)) *world-up*)))))
+    (light-controls dt)
     (update-view dt)))
 
 (defun draw ()
@@ -285,19 +358,22 @@ void main() {
 
    ;; depth map render
    (gficl:bind-gl *shadow-fb*)
+   (gl:enable :depth-test)
    (gl:disable :multisample)
    (gl:clear :depth-buffer)
+   (gl:viewport 0 0 +shadow-map-size+ +shadow-map-size+)
    (gficl:bind-gl *shadow-shader*)
    (gficl:bind-matrix *shadow-shader* "view" *light-view*)
    (draw-render-obj-shadow *bunny*)
    (draw-render-obj-shadow *cube*)
    (draw-render-obj-shadow *sphere*)
-   (draw-render-obj-shadow *plane*)
 
    ;; main render
    (gficl:bind-gl *fb*)
    (gl:enable :multisample)
+   (gl:clear-color 0.8 0.5 0 0)
    (gl:clear :color-buffer :depth-buffer)
+   (gl:viewport 0 0 (gficl:window-width) (gficl:window-height))
    
    (gficl:bind-gl *debug-shader*)
    (gl:disable :cull-face)
@@ -307,7 +383,8 @@ void main() {
    (gl:draw-arrays :triangles 0 3)
    
    (gficl:bind-gl *main-shader*)
-   (gl:enable :cull-face)
+   (gl:enable :cull-face :depth-test)
+   (gl:cull-face :front)
    (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *shadow-fb* 0))
    (gficl:bind-matrix *main-shader* "view" *view*)
    (gficl:bind-vec *main-shader* "cam" *position*)

@@ -177,7 +177,7 @@ The axes can be a VEC or a list of numbers."
   "create a 4x4 view MATRIX pointing along the FORWARD vector at the given POSITION.
 FORWARD and WORLD-UP must be non-zero, and are automatically normalised.
 the args can be given as a VEC or a list of numbers.
-returns the view matrix and the left and up vectors."
+returns as values the view matrix, the left vector, and the up vector."
   `(create-view-matrix (make-vec-if-list ,position)
 		       (make-vec-if-list ,forward)
 		       (make-vec-if-list ,world-up)))
@@ -197,12 +197,13 @@ returns the view matrix and the left and up vectors."
      (0 0 ,(/ -2 (- far near))  ,(- (/ (+ far near) (- far near))))
      (0 0 0 1))))
 
-(declaim (ftype (function (number number) matrix) screen-orthographic-matrix))
-(defun screen-orthographic-matrix (width height)
-  "create a 4x4 orthographic projection MATRIX with depth -1 to 1 based on the screen dimension"
+(declaim (ftype (function (number number &key (:near number) (:far number)) matrix)
+		screen-orthographic-matrix))
+(defun screen-orthographic-matrix (width height &key (near -1) (far 1))
+  "create a 4x4 orthographic projection MATRIX based on the screen dimension."
   (assert (and (> width 0) (> height 0)) ()
 	  "ortho width and height must be positive: ~ax~a" width height)
-  (orthographic-matrix 0 height 0 width -1 1))
+  (orthographic-matrix 0 height 0 width near far))
 
 (declaim (ftype (function (number number number number number &optional number) matrix)
 		perspective-matrix))
@@ -212,7 +213,7 @@ returns the view matrix and the left and up vectors."
    `((,(/ (* 2 near) (- right left)) 0 ,(- (/ (+ right left) (- right left))) 0)
      (0 ,(/ (* 2 near) (- top bottom)) ,(- (/ (+ top bottom) (- top bottom))) 0)
      ,(if far
-	  `(0 0 ,(/ (+ far near) (- far near)) ,(- (/ (* 2 far near) (- far near))))
+	  `(0 0 ,(- (/ (+ far near) (- far near))) ,(- (/ (* 2 far near) (- far near))))
 	`(0 0 1 ,(- (* 2 near))))
      (0 0 1 0))))
 
