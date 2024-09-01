@@ -150,6 +150,7 @@ void main() {
 ;; framebuffers
 (defparameter *fb* nil)
 (defparameter *shadow-fb* nil)
+(defparameter *shadow-multisample-fb* nil)
 ;; camera
 (defparameter *forward* nil)
 (defparameter *position* nil)
@@ -283,15 +284,17 @@ void main() {
 ;;; ---- Draw ----
 
 (defun draw-occluder-pass ()
-  (gficl:bind-gl *shadow-fb*)
+  (gficl:bind-gl *shadow-multisample-fb*)
   (gl:enable :depth-test)
-  (gl:disable :multisample)
+  (gl:enable :multisample)
   (gl:clear :depth-buffer)
   (gl:viewport 0 0 +shadow-map-size+ +shadow-map-size+)
   (gficl:bind-gl *shadow-shader*)
   (draw-render-obj-shadow *bunny*)
   (draw-render-obj-shadow *cube*)
-  (draw-render-obj-shadow *sphere*))
+  (draw-render-obj-shadow *sphere*)
+  (gficl:blit-framebuffers *shadow-multisample-fb* *shadow-fb* +shadow-map-size+ +shadow-map-size+
+			   :buffer-list '(:depth-buffer-bit) :filter :nearest))
 
 (defun draw-debug ()
   (gficl:bind-gl *debug-shader*)
@@ -393,7 +396,11 @@ void main() {
 	 (list (gficl:make-attachment-description :depth-attachment :type :texture))
 	 +shadow-map-size+ +shadow-map-size+))
   (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *shadow-fb* 0))
-  (gl:tex-parameter :texture-2d :texture-compare-mode :compare-ref-to-texture))
+  (gl:tex-parameter :texture-2d :texture-compare-mode :compare-ref-to-texture)
+  (setf *shadow-multisample-fb*
+	(gficl:make-framebuffer
+	 (list (gficl:make-attachment-description :depth-attachment))
+	 +shadow-map-size+ +shadow-map-size+ :samples 8)))
 
 (defun resize (w h)
   (gficl:bind-gl *main-shader*)
@@ -422,7 +429,8 @@ void main() {
   
   (gficl:delete-gl *main-shader*)
   (gficl:delete-gl *shadow-shader*)
-  (gficl:delete-gl *debug-shader*)  
+  (gficl:delete-gl *debug-shader*)
   
   (gficl:delete-gl *fb*)
-  (gficl:delete-gl *shadow-fb*))
+  (gficl:delete-gl *shadow-fb*)
+  (gficl:delete-gl *shadow-multisample-fb*))

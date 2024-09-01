@@ -4,6 +4,8 @@ A common lisp library for simplifying the creation of opengl apps.
 This does not replace opengl functions, instead making things like
 framebuffer creation and vertex data loading easier.
 
+check out `examples` for how to use this library.
+
 ## Requirements
 
 * A Common Lisp Implementation (tested with SBCL)

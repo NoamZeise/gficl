@@ -75,11 +75,7 @@ void main() {
 (defparameter *world-up* nil)
 
 (defun setup ()
-  (let* ((bunny-mesh (car (obj:extract-meshes (obj:parse (probe-file *bunny-path*))))))
-    (setf *bunny* (gficl:make-vertex-data-from-vectors
-		   *vertex-data-form*
-		   (obj:vertex-data bunny-mesh)
-		   (obj:index-data bunny-mesh))))
+  (setf *bunny* (car (gficl/load:model *bunny-path*)))
   (setf *main-shader* (gficl:make-shader *main-vert-code* *main-frag-code*))
   (gl:clear-color 0.8 0.5 0 0)
   (gficl:bind-gl *main-shader*)
