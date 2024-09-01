@@ -116,7 +116,7 @@ void main() {}")
 out vec2 uv;
 uniform mat4 transform;
 void main() {
-  uv = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+  uv = vec2(((2 - gl_VertexID) << 1) & 2, (2 - gl_VertexID) & 2);
   gl_Position = transform * vec4(uv * 2.0f - 1.0f, 0.0f, 1.0f);}")
 (defparameter *debug-frag*
   "#version 330
@@ -128,43 +128,55 @@ uniform float far;
 void main() { 
   if(uv.x > 1 || uv.y > 1 || uv.x < 0 || uv.y < 0) discard;
   float d = texture(tex, uv).r;
-  d = (2 * near) / (far + near - d * (far - near));
-  
+  d = (2 * near) / (far + near - d * (far - near));  
   colour = vec4(vec3(d), 1);
 }")
 
 (defconstant +max-samples+ 8)
 (defconstant +shadow-map-size+ 1000)
 
+;;; ---- Globals ----
+
+;; assets
 (defparameter *bunny* nil)
 (defparameter *plane* nil)
 (defparameter *cube* nil)
 (defparameter *sphere* nil)
-
-(defparameter *fb* nil)
+(defparameter *dummy-data* nil)
+;; shaders
 (defparameter *main-shader* nil)
-
-(defparameter *shadow-fb* nil)
 (defparameter *shadow-shader* nil)
-
 (defparameter *debug-shader* nil)
-(defparameter *dummy-vert* nil)
-
+;; framebuffers
+(defparameter *fb* nil)
+(defparameter *shadow-fb* nil)
 ;; camera
 (defparameter *forward* nil)
 (defparameter *position* nil)
 (defparameter *target* nil)
 (defparameter *view* nil)
 (defparameter *world-up* (gficl:make-vec '(0 1 0)))
-
 (defparameter *cam-move* nil)
-
 ;; light
 (defparameter *light-ortho-mode* nil)
 (defparameter *light-ro* nil)
 (defparameter *light-pos* nil)
 (defparameter *light-view* nil)
 (defparameter *light-proj* nil)
+
+
+;;; ---- Main ----
+
+(defun run ()
+  (gficl:with-window
+   (:title "shadows example" :width 600 :height 600 :resize-callback #'resize)
+   (setup)
+   (loop until (gficl:closed-p)
+	 do (update)
+	 do (draw))
+   (cleanup)))
+
+;;; ---- Render Object ----
 
 (defclass render-obj ()
   ((vertex-data :initarg :vertex-data :accessor vertex-data :type gficl:vertex-data)
@@ -191,74 +203,14 @@ void main() {
 (defun load-model (path)
   (car (gficl/load:model path :vertex-form '(:position :normal))))
 
-(defun setup ()
-  (setf *light-pos* (gficl:make-vec '(10 9 10)))
-  (setf *cam-move* t)
-  (setf *light-ortho-mode* nil)
-  (setf *bunny*
-	(make-render-obj
-	 (load-model *bunny-path*)
-	 (gficl:*mat
-	  (gficl:translation-matrix '(-1.5 0 -2))
-	  (gficl:scale-matrix '(3 3 3)))))
-  (setf *cube*
-	(make-render-obj
-	 (load-model *cube-path*)
-	 (gficl:*mat
-	  (gficl:translation-matrix '(2 -1 1))
-	  (gficl:scale-matrix '(1 1.5 1)))))
-  (let ((sphere (load-model *sphere-path*)))
-    (setf *sphere* (make-render-obj sphere (gficl:translation-matrix '(-2 1 1.5))))
-    (setf *light-ro* (make-render-obj sphere (gficl:translation-matrix *light-pos*))))
-  (setf *plane*
-	(make-render-obj
-	 (gficl:make-vertex-data
-	  (gficl:make-vertex-form
-	   (list (gficl:make-vertex-slot 3 :float)
-		 (gficl:make-vertex-slot 3 :float)))
-	  (getf *plane-data* :verts) (getf *plane-data* :indices))
-	 (gficl:*mat
-	  (gficl:translation-matrix '(0 -1.15 0))
-	  (gficl:scale-matrix '(7 1 7)))))
+;;; ---- Update ----
 
-  (setf *dummy-vert*
-	(gficl:make-vertex-data (gficl:make-vertex-form (list (gficl:make-vertex-slot 1 :int)))
-				'(((0))) '(0 0 0)))
-  
-  (setf *main-shader* (gficl:make-shader *main-vert-code* *main-frag-code*))
-  (setf *shadow-shader* (gficl:make-shader *shadow-vert* *shadow-frag*))
-  
-  (setf *debug-shader* (gficl:make-shader *debug-vert* *debug-frag*))
-  (gficl:bind-gl *debug-shader*)
-  (gl:uniformi (gficl:shader-loc *debug-shader* "tex") 0)
-  (gficl:bind-matrix *debug-shader* "transform"
-		     (gficl:*mat
-		      (gficl:translation-matrix '(0.7 0.7 0))
-		      (gficl:scale-matrix '(0.3 0.3 0))))
-
+(defun update-light-vp ()
   (gficl:bind-gl *main-shader*)
-  (gl:uniformi (gficl:shader-loc *main-shader* "shadow") 0)
-  (setf *fb* nil)
-  (resize (gficl:window-width) (gficl:window-height))
-  
-  (if *shadow-fb* (gficl:delete-gl *shadow-fb*))
-  (setf *shadow-fb*
-	(gficl:make-framebuffer
-	 (list (gficl:make-attachment-description :depth-attachment :type :texture))
-	 +shadow-map-size+ +shadow-map-size+))
-  (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *shadow-fb* 0))
-  (gl:tex-parameter :texture-2d :texture-compare-mode :compare-ref-to-texture)
-  (toggle-light-mode)
-  (update-light-pos)
-  
-  (setf *view* (gficl:make-matrix))
-  (setf *position* (gficl:make-vec'(5 1 5)))
-  (setf *target* (gficl:make-vec '(0 0 0)))
-  (update-view 0))
+  (gficl:bind-matrix *main-shader* "light_view_proj" (gficl:*mat *light-proj* *light-view*)))
 
 (defun set-light-projection (proj far-max bias)
-  (setf *light-proj* proj)
-  
+  (setf *light-proj* proj)  
   (gficl:bind-gl *shadow-shader*)
   (gficl:bind-matrix *shadow-shader* "projection" *light-proj*)
   
@@ -270,45 +222,19 @@ void main() {
   (gl:uniformf (gficl:shader-loc *main-shader* "bias_factor") bias)
   (update-light-vp))
 
-(defun toggle-light-mode ()
+(defun toggle-light-projection-mode ()
+  "Switch between Orthographic and Perspective shadow map light mode."
   (setf *light-ortho-mode* (not *light-ortho-mode*))
   (if *light-ortho-mode*
       (set-light-projection (gficl:orthographic-matrix 10 -10 -10 10 80 -80) 5 20)
-    (set-light-projection
-     (let* ((near 0.5) (edge (* near (tan (/ pi 6.0)))))
-       (gficl:perspective-matrix edge (- edge) (- edge) edge near))
-     50 1)))
-
-(defun resize (w h)
-  (gficl:bind-gl *main-shader*)
-  (gficl:bind-matrix *main-shader* "projection"
-		     (gficl:screen-perspective-matrix w h (* pi 0.4) 0.1))
-  (if *fb* (gficl:delete-gl *fb*))
-  (setf *fb* (gficl:make-framebuffer
-	      (list (gficl:make-attachment-description :color-attachment0)
-		    (gficl:make-attachment-description :depth-stencil-attachment))
-	      w h :samples (min +max-samples+ (gl:get-integer :max-samples)))))
-
-(defun cleanup ()
-  (gficl:delete-gl (vertex-data *bunny*))
-  (gficl:delete-gl (vertex-data *cube*))
-  (gficl:delete-gl (vertex-data *sphere*))
-  (gficl:delete-gl (vertex-data *plane*))
-  (gficl:delete-gl *main-shader*)
-  (gficl:delete-gl *shadow-shader*)
-
-  (gficl:delete-gl *debug-shader*)
-  (gficl:delete-gl *dummy-vert*)
-  
-  (gficl:delete-gl *fb*)
-  (gficl:delete-gl *shadow-fb*))
-
-(defun update-light-vp ()
-  (gficl:bind-gl *main-shader*)
-  (gficl:bind-matrix *main-shader* "light_view_proj" (gficl:*mat *light-proj* *light-view*)))
+    (let* ((near 0.5) (edge (* near (tan (/ pi 6.0))))
+	   (mat (gficl:perspective-matrix edge (- edge) (- edge) edge near)))
+      (set-light-projection mat 50 1))))
 
 (defun update-light-pos ()
   (setf *light-view* (gficl:view-matrix *light-pos* (gficl:-vec '(0 -4 0) *light-pos*) *world-up*))
+  (gficl:bind-gl *shadow-shader*)
+  (gficl:bind-matrix *shadow-shader* "view" *light-view*)
   (update-light-vp)
   (gficl:bind-vec *main-shader* "light_pos" *light-pos*))
 
@@ -320,7 +246,7 @@ void main() {
      (:a (setf *light-pos* (gficl:+vec *light-pos* (list 0 0 speed))))
      (:d (setf *light-pos* (gficl:+vec *light-pos* (list 0 0 (* -1 speed)))))))
   (gficl:map-keys-pressed
-   (:z (toggle-light-mode)))
+   (:z (toggle-light-projection-mode)))
   (update-light-pos))
 
 (defun update-view (dt)
@@ -329,16 +255,17 @@ void main() {
 	    (gficl:quat-conjugate-vec (gficl:make-unit-quat (* 0.1 dt) *world-up*) *position*)))
   (setf *forward* (gficl:-vec *target* *position*))
   (setf *view* (gficl:view-matrix *position* *forward* *world-up*))
-  (set-model-mat *light-ro* (gficl:translation-matrix *light-pos*)))
+  (set-model-mat *light-ro* (gficl:translation-matrix *light-pos*))
+  (gficl:bind-gl *main-shader*)
+  (gficl:bind-matrix *main-shader* "view" *view*)
+  (gficl:bind-vec *main-shader* "cam" *position*))
 
 (defun update ()
-  (gficl:with-update (dt)
-    
+  (gficl:with-update (dt)    
     (gficl:map-keys-pressed
      (:escape (glfw:set-window-should-close))
      (:f (gficl:toggle-fullscreen))
-     (:x (setf *cam-move* (not *cam-move*))))
-    
+     (:x (setf *cam-move* (not *cam-move*))))    
     (gficl:map-keys-down
      (:up (setf *position*   (gficl:+vec *position* (gficl:*vec (*  0.2 dt) *forward*))))	
      (:down (setf *position* (gficl:+vec *position* (gficl:*vec (* -0.2 dt) *forward*))))
@@ -353,55 +280,149 @@ void main() {
     (light-controls dt)
     (update-view dt)))
 
+;;; ---- Draw ----
+
+(defun draw-occluder-pass ()
+  (gficl:bind-gl *shadow-fb*)
+  (gl:enable :depth-test)
+  (gl:disable :multisample)
+  (gl:clear :depth-buffer)
+  (gl:viewport 0 0 +shadow-map-size+ +shadow-map-size+)
+  (gficl:bind-gl *shadow-shader*)
+  (draw-render-obj-shadow *bunny*)
+  (draw-render-obj-shadow *cube*)
+  (draw-render-obj-shadow *sphere*))
+
+(defun draw-debug ()
+  (gficl:bind-gl *debug-shader*)
+  (gl:active-texture :texture0)
+  (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *shadow-fb* 0))
+  (gficl:bind-gl *dummy-data*)
+  (gl:draw-arrays :triangles 0 3))
+
+(defun draw-main-scene ()
+  (gficl:bind-gl *main-shader*)
+  (gl:enable :depth-test)
+  (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *shadow-fb* 0))
+  (gl:uniformi (gficl:shader-loc *main-shader* "shaded") 1)
+  (draw-render-obj *bunny*)
+  (draw-render-obj *cube*)
+  (draw-render-obj *sphere*)
+  (draw-render-obj *plane*)
+  (gl:uniformi (gficl:shader-loc *main-shader* "shaded") 0)
+  (draw-render-obj *light-ro*))
+
+(defun draw-main-pass ()
+  (gficl:bind-gl *fb*)
+  (gl:enable :multisample)
+  (gl:clear-color 0.8 0.5 0 0)
+  (gl:clear :color-buffer :depth-buffer)
+  (gl:viewport 0 0 (gficl:window-width) (gficl:window-height))
+  (draw-debug)
+  (draw-main-scene)
+  (gficl:blit-framebuffers *fb* 0 (gficl:window-width) (gficl:window-height)))
+
 (defun draw ()
   (gficl:with-render
+   (draw-occluder-pass)
+   (draw-main-pass)))
 
-   ;; depth map render
-   (gficl:bind-gl *shadow-fb*)
-   (gl:enable :depth-test)
-   (gl:disable :multisample)
-   (gl:clear :depth-buffer)
-   (gl:viewport 0 0 +shadow-map-size+ +shadow-map-size+)
-   (gficl:bind-gl *shadow-shader*)
-   (gficl:bind-matrix *shadow-shader* "view" *light-view*)
-   (draw-render-obj-shadow *bunny*)
-   (draw-render-obj-shadow *cube*)
-   (draw-render-obj-shadow *sphere*)
+;;; ---- Setup / Cleanup ----
 
-   ;; main render
-   (gficl:bind-gl *fb*)
-   (gl:enable :multisample)
-   (gl:clear-color 0.8 0.5 0 0)
-   (gl:clear :color-buffer :depth-buffer)
-   (gl:viewport 0 0 (gficl:window-width) (gficl:window-height))
-   
-   (gficl:bind-gl *debug-shader*)
-   (gl:disable :cull-face)
-   (gl:active-texture :texture0)
-   (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *shadow-fb* 0))
-   (gficl:bind-gl *dummy-vert*)
-   (gl:draw-arrays :triangles 0 3)
-   
-   (gficl:bind-gl *main-shader*)
-   (gl:enable :cull-face :depth-test)
-   (gl:cull-face :front)
-   (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *shadow-fb* 0))
-   (gficl:bind-matrix *main-shader* "view" *view*)
-   (gficl:bind-vec *main-shader* "cam" *position*)
-   (gl:uniformi (gficl:shader-loc *main-shader* "shaded") 1)
-   (draw-render-obj *bunny*)
-   (draw-render-obj *cube*)
-   (draw-render-obj *sphere*)
-   (draw-render-obj *plane*)
-   (gl:uniformi (gficl:shader-loc *main-shader* "shaded") 0)
-   (draw-render-obj *light-ro*)
-   (gficl:blit-framebuffers *fb* 0 (gficl:window-width) (gficl:window-height))))
+(defun setup-globals ()
+  (setf *fb* nil)
+  
+  (setf *light-pos* (gficl:make-vec '(10 9 10)))
+  (setf *cam-move* t)
+  (setf *light-ortho-mode* nil)
+  
+  (setf *view* (gficl:make-matrix))
+  (setf *position* (gficl:make-vec'(5 1 5)))
+  (setf *target* (gficl:make-vec '(0 0 0))))
 
-(defun run ()
-  (gficl:with-window
-   (:title "shadows example" :width 600 :height 600 :resize-callback #'resize)
-   (setup)
-   (loop until (gficl:closed-p)
-	 do (update)
-	 do (draw))
-   (cleanup)))
+(defun setup-render-objects ()
+  (setf *bunny*
+	(make-render-obj
+	 (load-model *bunny-path*)
+	 (gficl:*mat (gficl:translation-matrix '(-1.5 0 -2)) (gficl:scale-matrix '(3 3 3)))))
+  (setf *cube*
+	(make-render-obj
+	 (load-model *cube-path*)
+	 (gficl:*mat (gficl:translation-matrix '(2 -1 1)) (gficl:scale-matrix '(1 1.5 1)))))
+  
+  (let ((sphere-data (load-model *sphere-path*)))
+    (setf *sphere* (make-render-obj sphere-data (gficl:translation-matrix '(-2 1 1.5))))
+    (setf *light-ro* (make-render-obj sphere-data (gficl:translation-matrix *light-pos*))))
+  
+  (let ((plane-data (gficl:make-vertex-data
+		     (gficl:make-vertex-form
+		      (list (gficl:make-vertex-slot 3 :float) (gficl:make-vertex-slot 3 :float)))
+		     (getf *plane-data* :verts) (getf *plane-data* :indices))))
+    (setf *plane* (make-render-obj plane-data
+				   (gficl:*mat (gficl:translation-matrix '(0 -1.15 0))
+					       (gficl:scale-matrix '(7 1 7))))))
+
+  (setf *dummy-data*
+	(gficl:make-vertex-data (gficl:make-vertex-form (list (gficl:make-vertex-slot 1 :int)))
+				'(((0))) '(0 0 0))))
+
+(defun setup-shader-variables ()
+  (gficl:bind-gl *debug-shader*)
+  (gl:uniformi (gficl:shader-loc *debug-shader* "tex") 0)
+  (gficl:bind-matrix *debug-shader* "transform"
+		     (gficl:*mat
+		      (gficl:translation-matrix '(0.7 0.7 0))
+		      (gficl:scale-matrix '(0.3 0.3 0))))
+  
+  (gficl:bind-gl *main-shader*)
+  (gl:uniformi (gficl:shader-loc *main-shader* "shadow") 0)
+  (toggle-light-projection-mode)
+  (update-light-pos)
+  (update-view 0))
+
+(defun setup-shaders ()
+  (setf *main-shader* (gficl:make-shader *main-vert-code* *main-frag-code*))
+  (setf *shadow-shader* (gficl:make-shader *shadow-vert* *shadow-frag*))  
+  (setf *debug-shader* (gficl:make-shader *debug-vert* *debug-frag*))
+  (setup-shader-variables))
+
+(defun setup-framebuffers ()
+  (resize (gficl:window-width) (gficl:window-height))  
+  (setf *shadow-fb*
+	(gficl:make-framebuffer
+	 (list (gficl:make-attachment-description :depth-attachment :type :texture))
+	 +shadow-map-size+ +shadow-map-size+))
+  (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *shadow-fb* 0))
+  (gl:tex-parameter :texture-2d :texture-compare-mode :compare-ref-to-texture))
+
+(defun resize (w h)
+  (gficl:bind-gl *main-shader*)
+  (gficl:bind-matrix *main-shader* "projection"
+		     (gficl:screen-perspective-matrix w h (* pi 0.4) 0.1))
+  (if *fb* (gficl:delete-gl *fb*))
+  (setf *fb* (gficl:make-framebuffer
+	      (list (gficl:make-attachment-description :color-attachment0)
+		    (gficl:make-attachment-description :depth-stencil-attachment))
+	      w h :samples (min +max-samples+ (gl:get-integer :max-samples)))))
+
+(defun setup ()
+  (setup-globals)
+  (setup-render-objects)
+  (setup-shaders)
+  (setup-framebuffers)
+  (gl:enable :cull-face)
+  (gl:cull-face :front))
+
+(defun cleanup ()
+  (gficl:delete-gl (vertex-data *bunny*))
+  (gficl:delete-gl (vertex-data *cube*))
+  (gficl:delete-gl (vertex-data *sphere*))
+  (gficl:delete-gl (vertex-data *plane*))
+  (gficl:delete-gl *dummy-data*)
+  
+  (gficl:delete-gl *main-shader*)
+  (gficl:delete-gl *shadow-shader*)
+  (gficl:delete-gl *debug-shader*)  
+  
+  (gficl:delete-gl *fb*)
+  (gficl:delete-gl *shadow-fb*))
