@@ -13,6 +13,7 @@
   :components ((:module "examples"
 		:components
 		((:file "package")
+		 (:file "minimum")
 		 (:file "quad-spin")
 		 (:file "cube-wave")
 		 (:file "post-processing")

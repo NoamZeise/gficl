@@ -30,6 +30,7 @@
    #:vertex-data
    #:make-vertex-data
    #:make-vertex-data-from-vectors
+   #:make-vertex-data-from-pointers
    #:draw-vertex-data
 
    ;; image

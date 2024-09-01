@@ -1,21 +1,31 @@
 # Gficl Examples
 
+An explaination of what each sample does and which new techniques it demonstrates.
+In order of complexity.
+
+## Minimum
+
+Draws a coloured triangle to the screen
+
+Shows:
+- update loop with input
+- shader creation and usage
+- loading and drawing vertex data
+- freeing resources
+
 ## Quad Spin
 
 An example of a 2d spinning quad.
 
 Shows:
 - using basic linear algebra operations
-- multisample dramebuffers
-- shader creation and uniform updating
-- loading vertex data to the gpu
+- multisample drawbuffers
+- updating shader uniforms
 - how to deal with resizing
 - load a texture to the gpu
 - dealing with mutisampling
-- draw to the screen
-- cleanup resources after
-- user input
 - fullscreen
+- update loop frame time variable
 
 ## Cube Wave
 

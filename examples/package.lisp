@@ -9,6 +9,7 @@
 	      (:export #:run)
 	      ,@body))
 
+(defexample minimum)
 (defexample quad-spin)
 (defexample cube-wave)
 (defexample post-processing)
