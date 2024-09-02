@@ -3,8 +3,8 @@
 (defsystem :gficl-examples
   :defsystem-depends-on (:deploy)
   :build-operation "deploy-op"
-  :build-pathname "cube-wave"
-  :entry-point "gficl-examples/cube-wave:run"
+  :build-pathname "shadows"
+  :entry-point "gficl-examples/shadows:run"
   :depends-on (:gficl
 	       ;; for model loading examples
 	       :gficl/load
