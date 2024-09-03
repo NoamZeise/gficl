@@ -2,9 +2,10 @@
 
 A common lisp library for simplifying the creation of opengl apps.
 This does not replace opengl functions, instead making things like
-framebuffer creation and vertex data loading easier.
+framebuffer creation and vertex data loading easier 
+and supplying linear algebra types and functions.
 
-check out `examples` for how to use this library.
+Check out the `examples` folder for a better idea.
 
 ## Requirements
 
@@ -15,13 +16,11 @@ check out `examples` for how to use this library.
 ## Building an Example 
 
 To check all the requirements are installed properly, run `make`.
-A portable executable version of one of the examples should be at `bin/cube-wave`.
+A portable executable version of one of the examples should be in `bin/`.
 
 ## Using the Library
 
-See `examples/` for how to use the library.
-
-`gficl-examples.asd` shows you how to import the library into your project.
+`gficl-examples.asd` shows you how you might use the library into your project.
 
 Any opengl objects created by gficl inherit from `GL-OBJECT` and need to be
 manually freed after their resources are no longer needed. 
