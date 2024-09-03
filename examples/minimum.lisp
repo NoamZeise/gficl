@@ -16,13 +16,13 @@ void main() {
 }")
 
 (defun run ()
-  (gficl:with-window (:title "minimum")		     
+  (gficl:with-window (:title "minimum")
     (let ((shader (gficl:make-shader *vert* *frag*))
 	  (data (gficl:make-vertex-data
 		 (gficl:make-vertex-form (list (gficl:make-vertex-slot 2 :float)))
 		 '(((0 0.9)) ((-0.9 -0.9)) ((0.9 -0.9))))))
       (gficl:bind-gl shader)
-      (loop until (gficl:closed-p)
+      (loop until (gficl:closedp)
 	    do (gficl:with-render ()
 		 (gl:clear :color-buffer)
 		 (gficl:draw-vertex-data data))

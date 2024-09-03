@@ -5,8 +5,8 @@
 (declaim (ftype (function ((or pathname string) &key (:vertex-form list)) list)
 		model))
 (defun model (model-path &key (vertex-form '(:position :normal :uv)))
-  "takes a path to a model and returns a list of meshes (each mesh a VERTEX-DATA).
-The vertex form is a list of VERTEX-ELEMENT (ie :position, :normal, :uv, or :skip)"
+  "takes a path to a model and returns a list of meshes (each mesh a VERTEX-DATA instance).
+:vertex-form is a list of VERTEX-ELEMENT (ie :position, :normal, :uv, or :skip)"
   (loop for mesh in (obj:extract-meshes (obj:parse (probe-file model-path))) collecting
 	(gficl:make-vertex-data-from-vectors
 	 (get-vertex-form mesh vertex-form)

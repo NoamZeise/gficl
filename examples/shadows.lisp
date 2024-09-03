@@ -172,7 +172,7 @@ void main() {
   (gficl:with-window
    (:title "shadows example" :width 600 :height 600 :resize-callback #'resize)
    (setup)
-   (loop until (gficl:closed-p)
+   (loop until (gficl:closedp)
 	 do (update)
 	 do (draw))
    (cleanup)))
@@ -400,7 +400,8 @@ void main() {
   (setf *shadow-multisample-fb*
 	(gficl:make-framebuffer
 	 (list (gficl:make-attachment-description :depth-attachment))
-	 +shadow-map-size+ +shadow-map-size+ :samples 8)))
+	 +shadow-map-size+ +shadow-map-size+ :samples
+	 (min +max-samples+ (gl:get-integer :max-samples)))))
 
 (defun resize (w h)
   (gficl:bind-gl *main-shader*)

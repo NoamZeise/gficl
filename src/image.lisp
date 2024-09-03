@@ -58,11 +58,15 @@
 	   (data-type :unsigned-byte))
   (declare (integer width) (integer height) (integer samples))
   "Make a texture, must be freed with DELETE-GL.
-Data should be null or a pointer to texture data 
+
+Data should be null or a pointer to texture data
 with enough bytes to create the texture, one byte for each channel.
 (no. bytes = width * height * channels)
-If samples > 1, a multisample texture will be created which does not use the data argument.
-If internal format is nil, it will match format. 
+
+If samples > 1, a multisample texture will be created, 
+in this case the data argument is ignored.
+
+If internal format is nil, it will be the same as format.
 This will work for colour textures, 
 but internal format must be speicifed for depth-stencil textures"
   (assert (and (> width 0) (> height 0) (> samples 0)) (width height samples)
@@ -146,7 +150,8 @@ When making non-colour textures, :format and :internal-format must be supplied."
 			  (values renderbuffer &optional))
 		make-renderbuffer))
 (defun make-renderbuffer (format width height samples)
-  "Make a renderbuffer, multisampled if samples > 1"
+  "Make a renderbuffer, multisampled if samples > 1.
+Must be manually freed with DELETE-GL."
   (assert (and (> width 0) (> height 0) (> samples 0)))
   (let ((id (gl:gen-renderbuffer)))
     (gl:bind-renderbuffer :renderbuffer id)

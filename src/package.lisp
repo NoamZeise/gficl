@@ -7,7 +7,7 @@
    #:with-render
    #:window-width
    #:window-height
-   #:closed-p
+   #:closedp
    #:toggle-fullscreen
    #:set-fullscreen
 

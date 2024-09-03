@@ -3,6 +3,8 @@
 ;; --- framebuffer attachment ---
 
 (defun color-attachment-p (position)
+  "Returns T if position is a valid framebuffer colour attachment position, 
+returns NIL otherwise."
   (let ((n
 	 (handler-case
 	     (parse-integer
@@ -12,11 +14,11 @@
 	   (error () -1)))
 	(max-attachments
 	 (cffi:with-foreign-object (p :int)
-	   ;; opengl does not change the supplied pointer
-	   ;; to get-xxx functions if it hasn't been loaded yet
-	   ;; so have some sane default for type checking before
-	   ;; ogl is loaded			   
-           (setf (cffi:mem-aref p :int) 16)
+	   ;; opengl does not change the supplied pointer to
+	   ;; gl:get-xxx functions if it hasn't been loaded yet
+	   ;; so we use some sane default for type checking
+	   ;; that happens before ogl is loaded
+	   (setf (cffi:mem-aref p :int) 16)
 	   (%gl:get-integer-v :max-color-attachments p)
 	   (cffi:mem-aref p :int))))
     (and (>= n 0)
@@ -44,7 +46,19 @@
 		make-attachment-description))
 (defun make-attachment-description (position &key (type :renderbuffer)
 					     (wrap :clamp-to-edge))
-  "defines the form an attachment to a framebuffer should take"
+  "Defines the properties of a FRAMEBUFFER attachment.
+A list of ATTACHMENT-DESCRIPTION is passed to MAKE-FRAMEBUFFER.
+
+ATTACHMENT-POSITION is what kind of drawing the attachment will be used for.
+Either one of the colour attachments, depth, stencil, or depth-stencil.
+
+:type can be a :renderbuffer or a :texture
+- :renderbuffer for attachments you do not need to sample from
+- :texture for attachments you want to sample from
+  texture ids can be accessed via FRAMEBUFFER-TEXTURE-ID
+
+:wrap will only affect framebuffers of type :texture and determine how
+it is sampled outside of it's range."
   (make-instance 'attachment-description :pos position :type type :wrap wrap))
 
 (defmethod print-object ((obj attachment-description) out)
@@ -65,15 +79,19 @@
 (declaim (ftype (function (list integer integer &key (:samples integer) (:draw-buffers list))
 			  (values framebuffer &optional))
 		make-framebuffer))
-(defun make-framebuffer (attachments width height
+(defun make-framebuffer (attachment-descriptions width height
 				     &key (samples 1) (draw-buffers () draw-buffers-supplied))
-  "creates a framebuffer from a list of attachment descriptions.
-:draw-buffers is a list of DRAW-BUFFER items.
-If :draw-buffers is not supplied, draw buffers will be all of the passed colour attachments."
+  "creates a framebuffer from a list of attachment descriptions. 
+Must be manually freed with DELETE-GL.
+
+The index of a framebuffer attachment is equal to it's position in the ATTACHMENT-DESCRIPTIONS list.
+
+:draw-buffers is a list of DRAW-BUFFER items. If :draw-buffers is not supplied, 
+draw buffers will be all of the passed colour attachments."
   (let ((id (gl:gen-framebuffer))
 	(draw-buffer-list draw-buffers)
 	(internal-attachments
-	 (loop for desc in attachments collecting
+	 (loop for desc in attachment-descriptions collecting
 	       (progn (assert (typep desc 'attachment-description) (desc)
 			      "~a was not an ATTACHMENT-DESCRIPTION" desc)
 		      (make-attachment desc width height samples)))))
@@ -102,6 +120,9 @@ If :draw-buffers is not supplied, draw buffers will be all of the passed colour 
 
 (declaim (ftype (function (framebuffer integer) (values integer &optional)) framebuffer-attach-id))
 (defun framebuffer-texture-id (framebuffer index)
+  "Return the texture id of the framebuffer attachment at index INDEX.
+Will signal an error if the index is out of range, or if the attachment
+at that index is not a texture attachment."
   (let ((attach (attachments framebuffer)))
     (dotimes (i index)
       (if (or (equalp attach nil) (equalp (cdr attach) nil))
@@ -109,14 +130,16 @@ If :draw-buffers is not supplied, draw buffers will be all of the passed colour 
       (setf attach (cdr attach)))
     (if (equalp (attachment-type (car attach)) :texture)
 	(id (resource (car attach)))
- 	(error "Tried to get the attachment id of a non texture attachment"))))
+      (error "Tried to get the attachment id of a non texture attachment"))))
 
 (declaim (ftype (function (t t integer integer &key
 			     (:buffer-list list) (:filter texture-filter)))
 		blit-framebuffers))	
 (defun blit-framebuffers (read-fb draw-fb width height &key	
 				  (buffer-list (list :color-buffer-bit)) (filter :nearest))
-  "blit framebuffers with same width and height, pass 0 or nil for backbuffer"
+  "blit framebuffers with same width and height, 
+such as for resolving a multisample framebuffer,
+pass 0 or nil as read-fb or draw-fb to use the backbuffer for a source or destination."
   (loop for b in buffer-list do
 	(assert (typep b 'buffer-mask) ()
 		"element ~a of buffer list is not a valid buffer mask: ~a"
@@ -153,7 +176,7 @@ If :draw-buffers is not supplied, draw buffers will be all of the passed colour 
 		make-attachment))
 (defun make-attachment (desc width height samples)
   "Create attachment resource. Either a texture or a renderbuffer.
-A suitable image format will be selected automatically if :internal-format is NIL."
+A suitable image format will be selected based on attachment position."
   (assert (and (> width 0) (> height 0) (> samples 0)))
   (let* ((pos (attachment-position desc))
 	 (resource-type (attachment-type desc))

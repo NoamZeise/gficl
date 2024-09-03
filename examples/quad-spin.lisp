@@ -137,7 +137,7 @@ void main() {
   (gficl:with-window
    (:title "spinning quad" :width 500 :height 500 :resize-callback #'resize)
    (setup)
-    (loop until (gficl:closed-p)
+    (loop until (gficl:closedp)
 	  do (update)
 	  do (render))
     (cleanup)))

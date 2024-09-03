@@ -151,7 +151,7 @@ void main() {
   (gficl:with-window
    (:title "bunny viewer" :width 600 :height 400 :resize-callback #'resize)
    (setup)
-   (loop until (gficl:closed-p)
+   (loop until (gficl:closedp)
 	 do (update)
 	 do (draw))
    (cleanup)))

@@ -5,7 +5,8 @@
 (declaim (ftype (function (pathname pathname) shader) make-shader-from-path))
 (defun make-shader-from-path (vertex-path fragment-path)
   "First load the shader code from the files specified, then
-create a shader using the code loaded."
+create a shader using the code loaded.
+Must be manually freed by calling DELETE-GL"
   (let ((vertex-code (uiop:read-file-string vertex-path))
 	(fragment-code (uiop:read-file-string fragment-path)))
     (make-shader vertex-code fragment-code)))
@@ -13,7 +14,8 @@ create a shader using the code loaded."
 (declaim (ftype (function (string string) shader) make-shader))
 (defun make-shader (vertex-code fragment-code)
   "Create a shader using the glsl source code supplied
-for the vertex and fragment shader."
+for the vertex and fragment shader.
+Must be manually freed by calling DELETE-GL"
   (let ((vert (compile-shader :vertex-shader vertex-code))
 	(frag (compile-shader :fragment-shader fragment-code))
 	(program (gl:create-program)))

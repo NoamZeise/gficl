@@ -1,22 +1,25 @@
 (in-package :gficl)
 
-(defun closed-p ()
-  "check if the window is to be closed"
+(defun closedp ()
+  "return T if the window should be closed, returns NIL otherwise."
   (glfw:window-should-close-p))
 
 (defun window-width ()
-  "get the current window width"
+  "returns the current window width"
   (win-width *state*))
 
 (defun window-height ()
-  "get the current window height"
+  "returns the current window height"
   (win-height *state*))
 
 (defun toggle-fullscreen ()
+  "Changes the window from windowed to fullscreen or fullscreen to windowed
+depending on it's current state."
   (set-fullscreen (not (fullscreen *state*))))
 
 (defmacro with-update ((&optional frame-time-var) &body body)
-  "poll input and window events. frame-time-var gives the seconds since last update"
+  "Polls input and window events. 
+frame-time-var gives the seconds since last update"
   (if frame-time-var
       `(let ((,frame-time-var (update-frame-time))) (update-render-state) (glfw:poll-events) ,@body)
     `(progn (glfw:poll-events) ,@body (update-render-state))))

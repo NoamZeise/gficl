@@ -222,7 +222,7 @@ void main() {
    (:title "post processing"
 	   :width *target-width* :height *target-height* :resize-callback #'resize)
    (setup)
-   (loop until (gficl:closed-p)
+   (loop until (gficl:closedp)
 	 do (update)
 	 do (draw))
    (cleanup)))

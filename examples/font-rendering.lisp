@@ -112,7 +112,7 @@ void main() {
   (gficl:with-window
    (:title "font rendering" :width 600 :height 400 :resize-callback 'resize)
    (setup)
-   (loop until (gficl:closed-p)
+   (loop until (gficl:closedp)
 	 do (update)
 	 do (render))
    (cleanup)))
