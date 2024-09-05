@@ -48,24 +48,43 @@ uniform vec3 light_pos;
 uniform sampler2DShadow shadow;
 uniform float bias_factor;
 
+float test_shadow(vec3 shadow_pos, vec2 offset, float bias) {  
+  shadow_pos.xy += offset;
+  shadow_pos.z -= bias;
+  return texture(shadow, shadow_pos); 
+}
+
 float in_shadow(vec3 n, vec3 l) {
   vec4 shadow_pos = shadow_world_pos;
   shadow_pos /= shadow_pos.w;
   shadow_pos += vec4(1);
   shadow_pos /= 2;
+  vec3 pos = shadow_pos.xyz;
   float bias = 0.000001 * bias_factor
              + 0.00005  * bias_factor * (1.0 - dot(n, -l));
-  shadow_pos.z -= bias;
-  return texture(shadow, shadow_pos.xyz); 
+  const float D = 0.002;
+  // PCF with a gaussian blur
+  mat3 ker = mat3(
+      1.5, 3, 1.5,
+      3,   5, 3,
+      1.5, 3, 1.5
+  ) / 23;
+  float s = 0;
+  for(int x = 0; x < 3; x++)
+    for(int y = 0; y < 3; y++)
+      s += test_shadow(pos, (x-1) * vec2(D,0) 
+                          + (y-1) * vec2(0,D), bias) 
+           * ker[x][y];
+  return s;
 }
 
 vec3 gooch(vec3 n, vec3 l, vec3 v, float in_shadow) {
-  // shading constants
+  // shading parameters
   vec3 object_colour = vec3(1);
   vec3 cool = vec3(0.2, 0, 0.55) + 0.25*object_colour;
   vec3 warm = vec3(0.5, 0.3, 0) + 0.5*object_colour;
   vec3 highlight = vec3(1, 0.8, 0.2);
-  float specular = 30.0f;
+  float specular = 20.0f;
 
   float t = (dot(n,l) + 1)/2.0;
   vec3 r = -reflect(l,n);
@@ -133,7 +152,7 @@ void main() {
 }")
 
 (defconstant +max-samples+ 8)
-(defconstant +shadow-map-size+ 1000)
+(defconstant +shadow-map-size+ 2048)
 
 ;;; ---- Globals ----
 
@@ -227,7 +246,7 @@ void main() {
   "Switch between Orthographic and Perspective shadow map light mode."
   (setf *light-ortho-mode* (not *light-ortho-mode*))
   (if *light-ortho-mode*
-      (set-light-projection (gficl:orthographic-matrix 10 -10 -10 10 80 -80) 5 20)
+      (set-light-projection (gficl:orthographic-matrix 8 -4 -4 4 80 -80) 5 20)
     (let* ((near 0.5) (edge (* near (tan (/ pi 6.0))))
 	   (mat (gficl:perspective-matrix edge (- edge) (- edge) edge near)))
       (set-light-projection mat 50 1))))
