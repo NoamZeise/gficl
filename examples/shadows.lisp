@@ -1,5 +1,15 @@
 (in-package :gficl-examples/shadows)
 
+;;; Shadow Mapping Example
+;;; ----------------------
+;;; Use Z to switch between a perspective and orthographic
+;;; Projection Mode for the shadow map.
+;;;
+;;; Use WASD to change the light position
+;;; and UP/DOWN/SPACE/SHIFT keys to change the camera position
+;;;
+;;; Use X to toggle camera rotation
+
 (defparameter *bunny-path* #p"examples/assets/bunny.obj")
 (defparameter *cube-path* #p"examples/assets/cube.obj")
 (defparameter *sphere-path* #p"examples/assets/sphere.obj")
@@ -48,6 +58,10 @@ uniform vec3 light_pos;
 uniform sampler2DShadow shadow;
 uniform float bias_factor;
 
+float random(vec2 co) {
+   return fract(sin(dot(co.xy,vec2(12.9898,78.233))) * 43758.5453);
+}
+
 float test_shadow(vec3 shadow_pos, vec2 offset, float bias) {  
   shadow_pos.xy += offset;
   shadow_pos.z -= bias;
@@ -61,7 +75,7 @@ float in_shadow(vec3 n, vec3 l) {
   shadow_pos /= 2;
   vec3 pos = shadow_pos.xyz;
   float bias = 0.000001 * bias_factor
-             + 0.00005  * bias_factor * (1.0 - dot(n, -l));
+             + 0.000005  * bias_factor * (1.0 - dot(n, -l));
   const float D = 0.002;
   // PCF with a gaussian blur
   mat3 ker = mat3(
@@ -70,10 +84,13 @@ float in_shadow(vec3 n, vec3 l) {
       1.5, 3, 1.5
   ) / 23;
   float s = 0;
+  // rotate sample points randomly at every pos
+  float angle = random(shadow_pos.xy);
+  mat2 rot = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
   for(int x = 0; x < 3; x++)
     for(int y = 0; y < 3; y++)
-      s += test_shadow(pos, (x-1) * vec2(D,0) 
-                          + (y-1) * vec2(0,D), bias) 
+      s += test_shadow(pos, rot *((x-1) * vec2(D,0) 
+                                + (y-1) * vec2(0,D)), bias) 
            * ker[x][y];
   return s;
 }
@@ -152,7 +169,7 @@ void main() {
 }")
 
 (defconstant +max-samples+ 8)
-(defconstant +shadow-map-size+ 2048)
+(defconstant +shadow-map-size+ 4096)
 
 ;;; ---- Globals ----
 
@@ -169,7 +186,6 @@ void main() {
 ;; framebuffers
 (defparameter *fb* nil)
 (defparameter *shadow-fb* nil)
-(defparameter *shadow-multisample-fb* nil)
 ;; camera
 (defparameter *forward* nil)
 (defparameter *position* nil)
@@ -303,7 +319,7 @@ void main() {
 ;;; ---- Draw ----
 
 (defun draw-occluder-pass ()
-  (gficl:bind-gl *shadow-multisample-fb*)
+  (gficl:bind-gl *shadow-fb*)
   (gl:enable :depth-test)
   (gl:enable :multisample)
   (gl:clear :depth-buffer)
@@ -311,9 +327,7 @@ void main() {
   (gficl:bind-gl *shadow-shader*)
   (draw-render-obj-shadow *bunny*)
   (draw-render-obj-shadow *cube*)
-  (draw-render-obj-shadow *sphere*)
-  (gficl:blit-framebuffers *shadow-multisample-fb* *shadow-fb* +shadow-map-size+ +shadow-map-size+
-			   :buffer-list '(:depth-buffer-bit) :filter :nearest))
+  (draw-render-obj-shadow *sphere*))
 
 (defun draw-debug ()
   (gficl:bind-gl *debug-shader*)
@@ -415,12 +429,7 @@ void main() {
 	 (list (gficl:make-attachment-description :depth-attachment :type :texture))
 	 +shadow-map-size+ +shadow-map-size+))
   (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *shadow-fb* 0))
-  (gl:tex-parameter :texture-2d :texture-compare-mode :compare-ref-to-texture)
-  (setf *shadow-multisample-fb*
-	(gficl:make-framebuffer
-	 (list (gficl:make-attachment-description :depth-attachment))
-	 +shadow-map-size+ +shadow-map-size+ :samples
-	 (min +max-samples+ (gl:get-integer :max-samples)))))
+  (gl:tex-parameter :texture-2d :texture-compare-mode :compare-ref-to-texture))
 
 (defun resize (w h)
   (gficl:bind-gl *main-shader*)
@@ -452,5 +461,4 @@ void main() {
   (gficl:delete-gl *debug-shader*)
   
   (gficl:delete-gl *fb*)
-  (gficl:delete-gl *shadow-fb*)
-  (gficl:delete-gl *shadow-multisample-fb*))
+  (gficl:delete-gl *shadow-fb*))
