@@ -1,6 +1,6 @@
 (in-package :gficl)
 
-(deftype colour-image-format () '(member :red :rg :rgb :rgba))
+(deftype colour-image-format () '(member :red :rg :rgb :rgba ))
 (deftype image-format ()
 	 '(or colour-image-format
 	      (member :depth-component :depth-stencil)))
@@ -52,7 +52,7 @@
 	   (internal-format nil)
 	   (samples 1)
 	   (data (cffi:null-pointer))
-	   (mipmapping nil)
+	   (mipmapping t)
 	   (wrap :repeat)
 	   (filter :nearest)
 	   (data-type :unsigned-byte))
@@ -72,8 +72,8 @@ but internal format must be speicifed for depth-stencil textures"
   (assert (and (> width 0) (> height 0) (> samples 0)) (width height samples)
 	  "Width (~d) Height (~d) Samples (~d) must all be greater than 0"
 	  width height samples)
-  (if internal-format (assert (typep internal-format 'internal-image-format))
-    (if (typep internal-format 'colour-image-format)
+  (if internal-format nil ;;(assert (typep internal-format 'internal-image-format))
+    (if (typep format 'colour-image-format)
 	(setf internal-format format)
       (error "Missing :internal-format
 When making non-colour textures, :format and :internal-format must be supplied.")))
@@ -85,7 +85,7 @@ When making non-colour textures, :format and :internal-format must be supplied."
     (if (equal type :texture-2d-multisample)
 	(%gl:tex-image-2d-multisample type samples internal-format width height :false)
       (gl:tex-image-2d type 0 internal-format width height 0 format data-type data))
-    (if mipmapping (gl:generate-mipmap id))
+    (if mipmapping (gl:generate-mipmap type))
     (if (equal type :texture-2d)
 	(progn (gl:tex-parameter type :texture-wrap-s wrap)
 	       (gl:tex-parameter type :texture-wrap-t wrap)
@@ -105,7 +105,7 @@ When making non-colour textures, :format and :internal-format must be supplied."
 			  (values texture &optional))
 		make-texture-with-fn))
 (defun make-texture-with-fn (width height fn &key
-				   (channels 4) (mipmapping nil) (wrap :repeat) (filter :nearest))
+				   (channels 4) (mipmapping t) (wrap :repeat) (filter :nearest))
   "FN is called for each pixel with x y args and must return CHANNELS number of bytes"
   (declare (integer channels))
   (assert (and (>= channels 1) (<= channels 4))
@@ -146,7 +146,8 @@ When making non-colour textures, :format and :internal-format must be supplied."
 (defclass renderbuffer (gl-object)
   ((samples :initarg :samples :accessor rb-samples)))
 
-(declaim (ftype (function (internal-image-format integer integer integer)
+(declaim (ftype (function (t ;;internal-image-format
+			   integer integer integer)
 			  (values renderbuffer &optional))
 		make-renderbuffer))
 (defun make-renderbuffer (format width height samples)

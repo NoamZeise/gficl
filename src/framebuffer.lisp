@@ -37,15 +37,18 @@ returns NIL otherwise."
 (defclass attachment-description ()
   ((pos :initarg :pos :accessor attachment-position :type attachment-position)
    (type :initarg :type :accessor attachment-type :type attachment-type)
-   (texture-wrap :initarg :wrap :accessor attachment-wrap :type texture-wrap)))
+   (texture-wrap :initarg :wrap :accessor attachment-wrap :type texture-wrap)
+   (internal-format :initarg :internal-format :accessor internal-format)))
 
 (declaim (ftype (function (attachment-position &key
 					       (:type attachment-type)
-					       (:wrap texture-wrap))
+					       (:wrap texture-wrap)
+					       (:internal-format t))
 			  (values attachment-description &optional))
 		make-attachment-description))
 (defun make-attachment-description (position &key (type :renderbuffer)
-					     (wrap :clamp-to-edge))
+					     (wrap :clamp-to-edge)
+					     (internal-format nil))
   "Defines the properties of a FRAMEBUFFER attachment.
 A list of ATTACHMENT-DESCRIPTION is passed to MAKE-FRAMEBUFFER.
 
@@ -58,8 +61,14 @@ Either one of the colour attachments, depth, stencil, or depth-stencil.
   texture ids can be accessed via FRAMEBUFFER-TEXTURE-ID
 
 :wrap will only affect framebuffers of type :texture and determine how
-it is sampled outside of it's range."
-  (make-instance 'attachment-description :pos position :type type :wrap wrap))
+it is sampled outside of it's range.
+
+:interal-format is the internal texture format used by the texture or renderbuffer"
+  (make-instance 'attachment-description
+		 :pos position
+		 :type type
+		 :wrap wrap
+		 :internal-format internal-format))
 
 (defmethod print-object ((obj attachment-description) out)
   (print-unreadable-object
@@ -186,7 +195,7 @@ A suitable image format will be selected based on attachment position."
 			(:color :rgb)			
 			(:depth-attachment :depth-component)
 			((:depth-stencil-attachment :stencil-attachment) :depth-stencil)))
-	 (internal-format format)
+	 (internal-format (if (internal-format desc) (internal-format desc) format))
 	 (data-type (ecase attachment-type
 			   (:color :unsigned-byte)
 			   (:depth-stencil-attachment :unsigned-int-24-8)
@@ -205,7 +214,8 @@ A suitable image format will be selected based on attachment position."
 				    :samples samples
 				    :wrap (attachment-wrap desc)
 				    :data-type data-type
-				    :filter filter))
+				    :filter filter
+				    :mipmapping nil))
 		     (:renderbuffer
 		      (make-renderbuffer internal-format width height samples)))))
     (make-instance 'attachment :position pos :res res :res-type resource-type)))

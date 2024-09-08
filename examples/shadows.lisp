@@ -21,13 +21,78 @@
 			     ((-1 0 1) (0 1 0)))
 		    :indices '(0 3 2 2 1 0)))
 
+(defparameter *shadow-vert* "
+#version 330
+layout (location = 0) in vec3 position;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+void main() {
+ gl_Position = projection * view * model * vec4(position, 1);}")
+(defparameter *shadow-frag* "
+#version 330
+void main() {}")
+
+(defparameter *vsm-vert* "
+#version 330
+layout (location = 0) in vec3 position;
+out vec4 pos;
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+void main() {
+ pos = projection * view * model * vec4(position, 1);
+ gl_Position = pos;}")
+(defparameter *vsm-frag* "
+#version 330
+in vec4 pos;
+out vec4 colour;
+void main() {
+ float depth = pos.z/pos.w;
+ depth += 1;
+ depth /= 2;
+ colour = vec4(depth, depth*depth, 0, 1);
+}")
+
+(defparameter *debug-vert*
+	      "#version 330
+out vec2 uv;
+uniform mat4 transform;
+void main() {
+  uv = vec2(((2 - gl_VertexID) << 1) & 2, (2 - gl_VertexID) & 2);
+  gl_Position = transform * vec4(uv * 2.0f - 1.0f, 0.0f, 1.0f);}")
+(defparameter *debug-frag*
+  "#version 330
+in vec2 uv;
+out vec4 colour;
+uniform sampler2D tex;
+uniform float near;
+uniform float far;
+uniform int shadow_mode;
+#define MODE_MAP 0
+#define MODE_VSM 1
+void main() { 
+  if(uv.x > 1 || uv.y > 1 || uv.x < 0 || uv.y < 0) discard;
+  colour = vec4(1);
+  if(shadow_mode == MODE_MAP) {
+    float d = texture(tex, uv).r;
+    d = (2 * near) / (far + near - d * (far - near));  
+    colour = vec4(vec3(d), 1);
+  }
+  if(shadow_mode == MODE_VSM) {
+    colour = texture(tex, uv).rgba;
+  }
+}")
 (defparameter *main-vert-code*
 	      "#version 330
 layout (location = 0) in vec3 position;
 layout (location = 1) in vec3 normal;
 
 out vec3 pos;
-out vec4 shadow_world_pos;
+out vec4 light_space_pos;
 out vec3 normal_vec;
 
 uniform mat4 model;
@@ -40,14 +105,14 @@ uniform mat4 light_view_proj;
 void main() {
  vec4 world_pos = model * vec4(position, 1);
  pos = vec3(world_pos);
- shadow_world_pos = (light_view_proj * vec4(pos, 1));
+ light_space_pos = (light_view_proj * vec4(pos, 1));
  normal_vec = vec3(normal_mat * vec4(normal, 1));
  gl_Position = projection * view * world_pos;}")
 
 (defparameter *main-frag-code*
   "#version 330
 in vec3 pos;
-in vec4 shadow_world_pos;
+in vec4 light_space_pos;
 in vec3 normal_vec;
 out vec4 colour;
 
@@ -57,6 +122,12 @@ uniform int shaded;
 uniform vec3 light_pos;
 uniform sampler2DShadow shadow;
 uniform float bias_factor;
+
+uniform sampler2D vsm_shadow_map;
+
+uniform int shadow_mode;
+#define MODE_MAP 0
+#define MODE_VSM 1
 
 float random(vec2 co) {
    return fract(sin(dot(co.xy,vec2(12.9898,78.233))) * 43758.5453);
@@ -68,12 +139,23 @@ float test_shadow(vec3 shadow_pos, vec2 offset, float bias) {
   return texture(shadow, shadow_pos); 
 }
 
-float in_shadow(vec3 n, vec3 l) {
-  vec4 shadow_pos = shadow_world_pos;
-  shadow_pos /= shadow_pos.w;
-  shadow_pos += vec4(1);
-  shadow_pos /= 2;
-  vec3 pos = shadow_pos.xyz;
+float single_sample_shadow(vec3 n, vec3 l) {
+ vec4 lpos = light_space_pos;
+  lpos /= lpos.w;
+  lpos += vec4(1);
+  lpos /= 2;
+  vec3 pos = lpos.xyz;
+  float bias = 0.000001 * bias_factor
+             + 0.000005  * bias_factor * (1.0 - dot(n, -l));
+  return test_shadow(pos, vec2(0, 0), bias);
+}
+
+float calc_in_shadow(vec3 n, vec3 l) {
+  vec4 lpos = light_space_pos;
+  lpos /= lpos.w;
+  lpos += vec4(1);
+  lpos /= 2;
+  vec3 pos = lpos.xyz;
   float bias = 0.000001 * bias_factor
              + 0.000005  * bias_factor * (1.0 - dot(n, -l));
   const float D = 0.002;
@@ -85,7 +167,7 @@ float in_shadow(vec3 n, vec3 l) {
   ) / 23;
   float s = 0;
   // rotate sample points randomly at every pos
-  float angle = random(shadow_pos.xy);
+  float angle = random(pos.xy);
   mat2 rot = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
   for(int x = 0; x < 3; x++)
     for(int y = 0; y < 3; y++)
@@ -93,6 +175,22 @@ float in_shadow(vec3 n, vec3 l) {
                                 + (y-1) * vec2(0,D)), bias) 
            * ker[x][y];
   return s;
+}
+
+float vsm_shadow() {
+  vec4 pos = light_space_pos;
+  pos /= pos.w;
+  pos += vec4(1);
+  pos /= 2;
+  float depth = pos.z;
+  vec2 float_vec = texture(vsm_shadow_map, pos.xy).xy;
+  float M1 = float_vec.x;
+  float M2 = float_vec.y;
+  float in_front = float(depth <= M1);
+  float s2 = M2 - M1*M1;
+  float diff = depth - M1;
+  float pmax = s2 / (s2 + diff*diff);
+  return max(in_front, pmax);
 }
 
 vec3 gooch(vec3 n, vec3 l, vec3 v, float in_shadow) {
@@ -128,48 +226,21 @@ void main() {
   vec3 l = normalize(light_pos - pos);
   vec3 v = normalize(cam - pos);
 
-  float in_shadow = in_shadow(n, l);
+  float in_shadow = 0.0;
+
+  if(shadow_mode == MODE_MAP)
+    in_shadow = calc_in_shadow(n, l);
+  if(shadow_mode == 2)
+    in_shadow = single_sample_shadow(n, l);
+  if(shadow_mode == MODE_VSM)
+    in_shadow = vsm_shadow();
   vec3 obj_colour = gooch(n, l, v, in_shadow) * edge_highlight(n, v);
-  colour = vec4(obj_colour, 1);
-}")
-
-(defparameter *shadow-vert* "
-#version 330
-layout (location = 0) in vec3 position;
-
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
-
-void main() {
- gl_Position = projection * view * model * vec4(position, 1);}")
-(defparameter *shadow-frag* "
-#version 330
-void main() {}")
-
-(defparameter *debug-vert*
-  "#version 330
-out vec2 uv;
-uniform mat4 transform;
-void main() {
-  uv = vec2(((2 - gl_VertexID) << 1) & 2, (2 - gl_VertexID) & 2);
-  gl_Position = transform * vec4(uv * 2.0f - 1.0f, 0.0f, 1.0f);}")
-(defparameter *debug-frag*
-  "#version 330
-in vec2 uv;
-out vec4 colour;
-uniform sampler2D tex;
-uniform float near;
-uniform float far;
-void main() { 
-  if(uv.x > 1 || uv.y > 1 || uv.x < 0 || uv.y < 0) discard;
-  float d = texture(tex, uv).r;
-  d = (2 * near) / (far + near - d * (far - near));  
-  colour = vec4(vec3(d), 1);
+  colour = vec4(obj_colour, 1)*0.001 + vec4(vec3(in_shadow), 1);
+  if(in_shadow > 1) colour = vec4(1, 0, 0, 1);
 }")
 
 (defconstant +max-samples+ 8)
-(defconstant +shadow-map-size+ 4096)
+(defconstant +shadow-map-size+ 2048)
 
 ;;; ---- Globals ----
 
@@ -182,10 +253,13 @@ void main() {
 ;; shaders
 (defparameter *main-shader* nil)
 (defparameter *shadow-shader* nil)
+(defparameter *vsm-shader* nil)
 (defparameter *debug-shader* nil)
 ;; framebuffers
 (defparameter *fb* nil)
 (defparameter *shadow-fb* nil)
+(defparameter *vsm-fb* nil)
+(defparameter *vsm-resolve-fb* nil)
 ;; camera
 (defparameter *forward* nil)
 (defparameter *position* nil)
@@ -232,8 +306,8 @@ void main() {
   (gficl:bind-matrix *main-shader* "normal_mat" (normal-mat ro))
   (gficl:draw-vertex-data (vertex-data ro)))
 
-(defun draw-render-obj-shadow (ro)
-  (gficl:bind-matrix *shadow-shader* "model" (model-mat ro))
+(defun draw-render-obj-shadow (ro shader)
+  (gficl:bind-matrix shader "model" (model-mat ro))
   (gficl:draw-vertex-data (vertex-data ro)))
 
 (defun load-model (path)
@@ -249,6 +323,8 @@ void main() {
   (setf *light-proj* proj)  
   (gficl:bind-gl *shadow-shader*)
   (gficl:bind-matrix *shadow-shader* "projection" *light-proj*)
+  (gficl:bind-gl *vsm-shader*)
+  (gficl:bind-matrix *vsm-shader* "projection" *light-proj*)
   
   (gficl:bind-gl *debug-shader*)
   (gl:uniformf (gficl:shader-loc *debug-shader* "near") 1)
@@ -271,6 +347,8 @@ void main() {
   (setf *light-view* (gficl:view-matrix *light-pos* (gficl:-vec '(0 -4 0) *light-pos*) *world-up*))
   (gficl:bind-gl *shadow-shader*)
   (gficl:bind-matrix *shadow-shader* "view" *light-view*)
+  (gficl:bind-gl *vsm-shader*)
+  (gficl:bind-matrix *vsm-shader* "view" *light-view*)
   (update-light-vp)
   (gficl:bind-vec *main-shader* "light_pos" *light-pos*))
 
@@ -318,29 +396,67 @@ void main() {
 
 ;;; ---- Draw ----
 
-(defun draw-occluder-pass ()
+(defgeneric draw-setup (sa)
+  (:documentation "called before occluder pass"))
+
+(defclass shadow-mapping ()
+  ())
+
+(defmethod draw-setup ((sa shadow-mapping))
   (gficl:bind-gl *shadow-fb*)
   (gl:enable :depth-test)
   (gl:enable :multisample)
   (gl:clear :depth-buffer)
   (gl:viewport 0 0 +shadow-map-size+ +shadow-map-size+)
+  (gficl:bind-gl *shadow-shader*))
+
+(defun draw-occluder-pass ()
+  (gficl:bind-gl *shadow-fb*)
+  (gl:enable :depth-test)
+  (gl:disable :multisample)
+  (gl:clear :depth-buffer)
+  (gl:viewport 0 0 +shadow-map-size+ +shadow-map-size+)
   (gficl:bind-gl *shadow-shader*)
-  (draw-render-obj-shadow *bunny*)
-  (draw-render-obj-shadow *cube*)
-  (draw-render-obj-shadow *sphere*))
+  (draw-render-obj-shadow *bunny* *shadow-shader*)
+  (draw-render-obj-shadow *cube* *shadow-shader*)
+  (draw-render-obj-shadow *sphere* *shadow-shader*))
+
+(defun draw-vsm-occulder-pass ()
+  (gficl:bind-gl *vsm-fb*)
+  (gl:enable :depth-test)
+  (gl:enable :multisample)
+  (gl:clear-color 10.0 100.0 0 0)
+  (gl:clear :color-buffer :depth-buffer)
+  (gl:viewport 0 0 +shadow-map-size+ +shadow-map-size+)
+  (gficl:bind-gl *vsm-shader*)
+  (draw-render-obj-shadow *bunny* *vsm-shader*)
+  (draw-render-obj-shadow *cube* *vsm-shader*)
+  (draw-render-obj-shadow *sphere* *vsm-shader*)
+  (gficl:blit-framebuffers *vsm-fb* *vsm-resolve-fb*
+			   +shadow-map-size+ +shadow-map-size+)
+  (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *vsm-resolve-fb* 0))
+  (gl:generate-mipmap :texture-2d))
 
 (defun draw-debug ()
   (gficl:bind-gl *debug-shader*)
+  (gl:uniformi (gficl:shader-loc *debug-shader* "shadow_mode") 1)
   (gl:active-texture :texture0)
-  (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *shadow-fb* 0))
+  (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id
+				*vsm-resolve-fb*
+			        ;;*shadow-fb*
+				0))
   (gficl:bind-gl *dummy-data*)
   (gl:draw-arrays :triangles 0 3))
 
 (defun draw-main-scene ()
   (gficl:bind-gl *main-shader*)
   (gl:enable :depth-test)
+  (gl:active-texture :texture0)
   (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *shadow-fb* 0))
+  (gl:active-texture :texture1)
+  (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *vsm-resolve-fb* 0))
   (gl:uniformi (gficl:shader-loc *main-shader* "shaded") 1)
+  (gl:uniformi (gficl:shader-loc *main-shader* "shadow_mode") 1)
   (draw-render-obj *bunny*)
   (draw-render-obj *cube*)
   (draw-render-obj *sphere*)
@@ -361,6 +477,7 @@ void main() {
 (defun draw ()
   (gficl:with-render
    (draw-occluder-pass)
+   (draw-vsm-occulder-pass)
    (draw-main-pass)))
 
 ;;; ---- Setup / Cleanup ----
@@ -412,6 +529,7 @@ void main() {
   
   (gficl:bind-gl *main-shader*)
   (gl:uniformi (gficl:shader-loc *main-shader* "shadow") 0)
+  (gl:uniformi (gficl:shader-loc *main-shader* "vsm_shadow_map") 1)
   (toggle-light-projection-mode)
   (update-light-pos)
   (update-view 0))
@@ -420,6 +538,7 @@ void main() {
   (setf *main-shader* (gficl:make-shader *main-vert-code* *main-frag-code*))
   (setf *shadow-shader* (gficl:make-shader *shadow-vert* *shadow-frag*))  
   (setf *debug-shader* (gficl:make-shader *debug-vert* *debug-frag*))
+  (setf *vsm-shader* (gficl:make-shader *vsm-vert* *vsm-frag*))
   (setup-shader-variables))
 
 (defun setup-framebuffers ()
@@ -429,7 +548,23 @@ void main() {
 	 (list (gficl:make-attachment-description :depth-attachment :type :texture))
 	 +shadow-map-size+ +shadow-map-size+))
   (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *shadow-fb* 0))
-  (gl:tex-parameter :texture-2d :texture-compare-mode :compare-ref-to-texture))
+  (gl:tex-parameter :texture-2d :texture-compare-mode :compare-ref-to-texture)
+  (setf *vsm-fb*
+	(gficl:make-framebuffer (list (gficl:make-attachment-description
+				       :color-attachment0
+				       :internal-format :rgba16f)
+				      (gficl:make-attachment-description :depth-attachment))
+				+shadow-map-size+ +shadow-map-size+
+				:samples (min +max-samples+ (gl:get-integer :max-samples))))
+  (setf *vsm-resolve-fb*
+	(gficl:make-framebuffer
+	 (list (gficl:make-attachment-description :color-attachment0
+						  :internal-format :rgba16f
+						  :type :texture))
+	 +shadow-map-size+ +shadow-map-size+))
+    (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *vsm-resolve-fb* 0))
+    (gl:tex-parameter :texture-2d :texture-min-filter :linear)
+    (gl:tex-parameter :texture-2d :texture-mag-filter :linear))
 
 (defun resize (w h)
   (gficl:bind-gl *main-shader*)
@@ -458,7 +593,10 @@ void main() {
   
   (gficl:delete-gl *main-shader*)
   (gficl:delete-gl *shadow-shader*)
+  (gficl:delete-gl *vsm-shader*)
   (gficl:delete-gl *debug-shader*)
   
   (gficl:delete-gl *fb*)
-  (gficl:delete-gl *shadow-fb*))
+  (gficl:delete-gl *shadow-fb*)
+  (gficl:delete-gl *vsm-fb*)
+  (gficl:delete-gl *vsm-resolve-fb*))
