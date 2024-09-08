@@ -177,12 +177,15 @@ float calc_in_shadow(vec3 n, vec3 l) {
   return s;
 }
 
-float vsm_shadow() {
+float vsm_shadow(vec3 n, vec3 l) {
   vec4 pos = light_space_pos;
   pos /= pos.w;
   pos += vec4(1);
   pos /= 2;
-  float depth = pos.z;
+  float bias = 0.00001 * bias_factor
+             + 0.00005  * bias_factor 
+               * (1.0 - dot(n, -l));
+  float depth = pos.z - bias;
   vec2 float_vec = texture(vsm_shadow_map, pos.xy).xy;
   float M1 = float_vec.x;
   float M2 = float_vec.y;
@@ -190,7 +193,7 @@ float vsm_shadow() {
   float s2 = M2 - M1*M1;
   float diff = depth - M1;
   float pmax = s2 / (s2 + diff*diff);
-  return max(in_front, pmax);
+  return max(in_front, pmax)*0.001 + float(depth <= M1)*0.9;
 }
 
 vec3 gooch(vec3 n, vec3 l, vec3 v, float in_shadow) {
@@ -233,7 +236,7 @@ void main() {
   if(shadow_mode == 2)
     in_shadow = single_sample_shadow(n, l);
   if(shadow_mode == MODE_VSM)
-    in_shadow = vsm_shadow();
+    in_shadow = vsm_shadow(n, l);
   vec3 obj_colour = gooch(n, l, v, in_shadow) * edge_highlight(n, v);
   colour = vec4(obj_colour, 1)*0.001 + vec4(vec3(in_shadow), 1);
   if(in_shadow > 1) colour = vec4(1, 0, 0, 1);
