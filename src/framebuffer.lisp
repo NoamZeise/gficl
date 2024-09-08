@@ -2,6 +2,8 @@
 
 ;; --- framebuffer attachment ---
 
+(glfw:ini)
+
 (defun color-attachment-p (position)
   "Returns T if position is a valid framebuffer colour attachment position, 
 returns NIL otherwise."
@@ -14,13 +16,14 @@ returns NIL otherwise."
 	   (error () -1)))
 	(max-attachments
 	 (cffi:with-foreign-object (p :int)
-	   ;; opengl does not change the supplied pointer to
-	   ;; gl:get-xxx functions if it hasn't been loaded yet
-	   ;; so we use some sane default for type checking
-	   ;; that happens before ogl is loaded
-	   (setf (cffi:mem-aref p :int) 16)
-	   (%gl:get-integer-v :max-color-attachments p)
-	   (cffi:mem-aref p :int))))
+				   ;; opengl does not change the supplied pointer to
+				   ;; gl:get-xxx functions if it hasn't been loaded yet
+				   ;; so we use some sane default for type checking
+				   ;; that happens before ogl is loaded
+				   (setf (cffi:mem-aref p :int) 16)
+				   (handler-case (%gl:get-integer-v :max-color-attachments p)
+				     (error ()))
+				   (cffi:mem-aref p :int))))
     (and (>= n 0)
 	 (<= n max-attachments))))
 
