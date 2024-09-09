@@ -2,8 +2,6 @@
 
 ;; --- framebuffer attachment ---
 
-(glfw:ini)
-
 (defun color-attachment-p (position)
   "Returns T if position is a valid framebuffer colour attachment position, 
 returns NIL otherwise."

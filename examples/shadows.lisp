@@ -104,8 +104,8 @@ uniform mat4 light_view_proj;
 
 void main() {
  vec4 world_pos = model * vec4(position, 1);
- pos = vec3(world_pos);
- light_space_pos = (light_view_proj * vec4(pos, 1));
+ light_space_pos = light_view_proj * world_pos;
+ pos = world_pos.xyz;
  normal_vec = vec3(normal_mat * vec4(normal, 1));
  gl_Position = projection * view * world_pos;}")
 
@@ -182,18 +182,33 @@ float vsm_shadow(vec3 n, vec3 l) {
   pos /= pos.w;
   pos += vec4(1);
   pos /= 2;
-  float bias = 0.00001 * bias_factor
-             + 0.00005  * bias_factor 
-               * (1.0 - dot(n, -l));
+  float perp = 1.0 - abs(dot(n, l));
+  float bias = 0.000001 * bias_factor
+             + 0.0001  * bias_factor 
+               * pow(perp, 9);
   float depth = pos.z - bias;
-  vec2 float_vec = texture(vsm_shadow_map, pos.xy).xy;
+  //vec2 float_vec = texture(vsm_shadow_map, pos.xy).xy;
+  const float D = 0.002;
+  // PCF with a gaussian blur
+  mat3 ker = mat3(
+      1.5, 3, 1.5,
+      3,   5, 3,
+      1.5, 3, 1.5
+  ) / 23;
+  vec2 float_vec = vec2(0);
+  for(int x = 0; x < 3; x++)
+    for(int y = 0; y < 3; y++)
+      float_vec += texture(vsm_shadow_map, pos.xy 
+                     + (x-1)*vec2(D, 0)
+                     + (y-1)*vec2(0, D)).xy
+                   * ker[x][y];
   float M1 = float_vec.x;
   float M2 = float_vec.y;
-  float in_front = float(depth <= M1);
-  float s2 = M2 - M1*M1;
+  if(depth <= M1) return 1.0;
+  float s2 = max(abs(M2 - M1*M1), 0.000003);
   float diff = depth - M1;
   float pmax = s2 / (s2 + diff*diff);
-  return max(in_front, pmax)*0.001 + float(depth <= M1)*0.9;
+  return pmax;
 }
 
 vec3 gooch(vec3 n, vec3 l, vec3 v, float in_shadow) {
@@ -238,7 +253,7 @@ void main() {
   if(shadow_mode == MODE_VSM)
     in_shadow = vsm_shadow(n, l);
   vec3 obj_colour = gooch(n, l, v, in_shadow) * edge_highlight(n, v);
-  colour = vec4(obj_colour, 1)*0.001 + vec4(vec3(in_shadow), 1);
+  colour = vec4(obj_colour, 1);//*0.001 + vec4(vec3(in_shadow), 1);
   if(in_shadow > 1) colour = vec4(1, 0, 0, 1);
 }")
 
@@ -427,7 +442,7 @@ void main() {
 (defun draw-vsm-occulder-pass ()
   (gficl:bind-gl *vsm-fb*)
   (gl:enable :depth-test)
-  (gl:enable :multisample)
+  (gl:disable :multisample)
   (gl:clear-color 10.0 100.0 0 0)
   (gl:clear :color-buffer :depth-buffer)
   (gl:viewport 0 0 +shadow-map-size+ +shadow-map-size+)
@@ -438,7 +453,8 @@ void main() {
   (gficl:blit-framebuffers *vsm-fb* *vsm-resolve-fb*
 			   +shadow-map-size+ +shadow-map-size+)
   (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *vsm-resolve-fb* 0))
-  (gl:generate-mipmap :texture-2d))
+  (gl:generate-mipmap :texture-2d)
+  )
 
 (defun draw-debug ()
   (gficl:bind-gl *debug-shader*)
@@ -555,14 +571,15 @@ void main() {
   (setf *vsm-fb*
 	(gficl:make-framebuffer (list (gficl:make-attachment-description
 				       :color-attachment0
-				       :internal-format :rgba16f)
+				       :internal-format :rgba32f)
 				      (gficl:make-attachment-description :depth-attachment))
 				+shadow-map-size+ +shadow-map-size+
-				:samples (min +max-samples+ (gl:get-integer :max-samples))))
+				:samples (min +max-samples+ (gl:get-integer :max-samples))
+				))
   (setf *vsm-resolve-fb*
 	(gficl:make-framebuffer
 	 (list (gficl:make-attachment-description :color-attachment0
-						  :internal-format :rgba16f
+						  :internal-format :rgba32f
 						  :type :texture))
 	 +shadow-map-size+ +shadow-map-size+))
     (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *vsm-resolve-fb* 0))
