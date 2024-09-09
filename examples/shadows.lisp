@@ -186,26 +186,31 @@ float vsm_shadow(vec3 n, vec3 l) {
   float bias = 0.000001 * bias_factor
              + 0.0001  * bias_factor 
                * pow(perp, 9);
-  float depth = pos.z - bias;
+  float depth = pos.z;// - bias;
   //vec2 float_vec = texture(vsm_shadow_map, pos.xy).xy;
-  const float D = 0.002;
   // PCF with a gaussian blur
-  mat3 ker = mat3(
-      1.5, 3, 1.5,
-      3,   5, 3,
-      1.5, 3, 1.5
-  ) / 23;
-  vec2 float_vec = vec2(0);
-  for(int x = 0; x < 3; x++)
-    for(int y = 0; y < 3; y++)
+  float kernel[5 * 5] = 
+      float[5*5]
+( 1, 4, 7, 4, 1,
+  4, 16, 26, 16, 4,
+  7, 26, 41, 26, 7,
+  4, 16, 26, 16, 4,
+  1, 4, 7, 4, 1
+);
+  const float D = 0.001;
+  vec2 float_vec = vec2(0);//texture(vsm_shadow_map, pos.xy).xy;
+  for(int x = 0; x < 5; x++)
+    for(int y = 0; y < 5; y++) {
       float_vec += texture(vsm_shadow_map, pos.xy 
-                     + (x-1)*vec2(D, 0)
-                     + (y-1)*vec2(0, D)).xy
-                   * ker[x][y];
+                     + (x-2)*vec2(D, 0)
+                     + (y-2)*vec2(0, D)).xy
+                   * kernel[y * 5 + x]*1/273;
+      }
+                  
   float M1 = float_vec.x;
   float M2 = float_vec.y;
   if(depth <= M1) return 1.0;
-  float s2 = max(abs(M2 - M1*M1), 0.000003);
+  float s2 = max(abs(M2 - M1*M1), 0.000001);
   float diff = depth - M1;
   float pmax = s2 / (s2 + diff*diff);
   return pmax;
@@ -431,7 +436,7 @@ void main() {
 (defun draw-occluder-pass ()
   (gficl:bind-gl *shadow-fb*)
   (gl:enable :depth-test)
-  (gl:disable :multisample)
+  (gl:enable :multisample)
   (gl:clear :depth-buffer)
   (gl:viewport 0 0 +shadow-map-size+ +shadow-map-size+)
   (gficl:bind-gl *shadow-shader*)
@@ -443,18 +448,18 @@ void main() {
   (gficl:bind-gl *vsm-fb*)
   (gl:enable :depth-test)
   (gl:disable :multisample)
-  (gl:clear-color 10.0 100.0 0 0)
+  (gl:clear-color 1.0 1.0 0 0)
   (gl:clear :color-buffer :depth-buffer)
   (gl:viewport 0 0 +shadow-map-size+ +shadow-map-size+)
   (gficl:bind-gl *vsm-shader*)
   (draw-render-obj-shadow *bunny* *vsm-shader*)
   (draw-render-obj-shadow *cube* *vsm-shader*)
   (draw-render-obj-shadow *sphere* *vsm-shader*)
+  (draw-render-obj-shadow *plane* *vsm-shader*)
   (gficl:blit-framebuffers *vsm-fb* *vsm-resolve-fb*
 			   +shadow-map-size+ +shadow-map-size+)
   (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id *vsm-resolve-fb* 0))
-  (gl:generate-mipmap :texture-2d)
-  )
+  (gl:generate-mipmap :texture-2d))
 
 (defun draw-debug ()
   (gficl:bind-gl *debug-shader*)
