@@ -126,11 +126,19 @@ uniform float bias_factor;
 uniform sampler2D vsm_shadow_map;
 
 uniform int shadow_mode;
-#define MODE_MAP 0
-#define MODE_VSM 1
+#define MODE_BASIC 0
+#define MODE_PCF 1
+#define MODE_VSM 2
 
 float random(vec2 co) {
    return fract(sin(dot(co.xy,vec2(12.9898,78.233))) * 43758.5453);
+}
+
+vec3 correct_light_pos() {
+  vec4 p = light_space_pos;
+  p /= p.w;
+  p += vec4(1);
+  return (p/2).xyz;
 }
 
 float test_shadow(vec3 shadow_pos, vec2 offset, float bias) {  
@@ -140,31 +148,17 @@ float test_shadow(vec3 shadow_pos, vec2 offset, float bias) {
 }
 
 float single_sample_shadow(vec3 n, vec3 l) {
- vec4 lpos = light_space_pos;
-  lpos /= lpos.w;
-  lpos += vec4(1);
-  lpos /= 2;
-  vec3 pos = lpos.xyz;
+  vec3 pos = correct_light_pos();
   float bias = 0.000001 * bias_factor
              + 0.000005  * bias_factor * (1.0 - dot(n, -l));
   return test_shadow(pos, vec2(0, 0), bias);
 }
 
-float calc_in_shadow(vec3 n, vec3 l) {
-  vec4 lpos = light_space_pos;
-  lpos /= lpos.w;
-  lpos += vec4(1);
-  lpos /= 2;
-  vec3 pos = lpos.xyz;
+float pcf_shadow(vec3 n, vec3 l) {
+  vec3 pos = correct_light_pos();
   float bias = 0.000001 * bias_factor
              + 0.000005  * bias_factor * (1.0 - dot(n, -l));
-  const float D = 0.002;
-  // PCF with a gaussian blur
-  mat3 ker = mat3(
-      1.5, 3, 1.5,
-      3,   5, 3,
-      1.5, 3, 1.5
-  ) / 23;
+  const float D = 0.001;
   float s = 0;
   // rotate sample points randomly at every pos
   float angle = random(pos.xy);
@@ -173,40 +167,14 @@ float calc_in_shadow(vec3 n, vec3 l) {
     for(int y = 0; y < 3; y++)
       s += test_shadow(pos, rot *((x-1) * vec2(D,0) 
                                 + (y-1) * vec2(0,D)), bias) 
-           * ker[x][y];
+           * 1/9;
   return s;
 }
 
 float vsm_shadow(vec3 n, vec3 l) {
-  vec4 pos = light_space_pos;
-  pos /= pos.w;
-  pos += vec4(1);
-  pos /= 2;
-  float perp = 1.0 - abs(dot(n, l));
-  float bias = 0.000001 * bias_factor
-             + 0.0001  * bias_factor 
-               * pow(perp, 9);
-  float depth = pos.z;// - bias;
-  //vec2 float_vec = texture(vsm_shadow_map, pos.xy).xy;
-  // PCF with a gaussian blur
-  float kernel[5 * 5] = 
-      float[5*5]
-( 1, 4, 7, 4, 1,
-  4, 16, 26, 16, 4,
-  7, 26, 41, 26, 7,
-  4, 16, 26, 16, 4,
-  1, 4, 7, 4, 1
-);
-  const float D = 0.001;
-  vec2 float_vec = vec2(0);//texture(vsm_shadow_map, pos.xy).xy;
-  for(int x = 0; x < 5; x++)
-    for(int y = 0; y < 5; y++) {
-      float_vec += texture(vsm_shadow_map, pos.xy 
-                     + (x-2)*vec2(D, 0)
-                     + (y-2)*vec2(0, D)).xy
-                   * kernel[y * 5 + x]*1/273;
-      }
-                  
+  vec3 pos = correct_light_pos();
+  float depth = pos.z;
+  vec2 float_vec = texture(vsm_shadow_map, pos.xy).xy;                  
   float M1 = float_vec.x;
   float M2 = float_vec.y;
   if(depth <= M1) return 1.0;
@@ -251,10 +219,10 @@ void main() {
 
   float in_shadow = 0.0;
 
-  if(shadow_mode == MODE_MAP)
-    in_shadow = calc_in_shadow(n, l);
-  if(shadow_mode == 2)
+  if(shadow_mode == MODE_BASIC)
     in_shadow = single_sample_shadow(n, l);
+  if(shadow_mode == MODE_PCF)
+    in_shadow = pcf_shadow(n, l);
   if(shadow_mode == MODE_VSM)
     in_shadow = vsm_shadow(n, l);
   vec3 obj_colour = gooch(n, l, v, in_shadow) * edge_highlight(n, v);
@@ -361,7 +329,7 @@ void main() {
   "Switch between Orthographic and Perspective shadow map light mode."
   (setf *light-ortho-mode* (not *light-ortho-mode*))
   (if *light-ortho-mode*
-      (set-light-projection (gficl:orthographic-matrix 8 -4 -4 4 80 -80) 5 20)
+      (set-light-projection (gficl:orthographic-matrix 8 -4 -4 4 0 -50) 5 20)
     (let* ((near 0.5) (edge (* near (tan (/ pi 6.0))))
 	   (mat (gficl:perspective-matrix edge (- edge) (- edge) edge near)))
       (set-light-projection mat 50 1))))
