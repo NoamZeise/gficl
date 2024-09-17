@@ -13,8 +13,9 @@ RUN echo '(load "~/quicklisp/setup.lisp")' >> ~/.sbclrc
 WORKDIR /gficl
 # COPY . .
 
-# -- to build and run --
-# docker build -t gficl
+# -- to build --
+# docker build . -t gficl
 # docker run -it --rm -v=.:/gficl gficl
 # make
 # exit
+# -- then the executable should be in a folder called bin
