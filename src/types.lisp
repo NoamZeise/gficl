@@ -12,7 +12,8 @@
 ;; --- gl object parent class ---
 
 (defclass gl-object ()
-  ((id :initarg :id :initform 0 :accessor id :type integer)))
+  ((id :initarg :id :initform 0 :accessor id :type integer)
+   (deleted :initform nil :type boolean)))
 
 (defun create-gl ()
   (setf *active-objects* (+ *active-objects* 1)))
@@ -21,7 +22,10 @@
   (:documentation "delete an OpenGL object"))
 
 (defmethod delete-gl ((obj gl-object))
-  (setf *active-objects* (- *active-objects* 1)))
+  (if (not (slot-value obj 'deleted))
+      (setf *active-objects* (- *active-objects* 1))
+    (format t "gl-object ~a deleted twice~%" obj))
+  (setf (slot-value obj 'deleted) t))
 
 (defgeneric bind-gl (obj)
   (:documentation "bind this object to the relevant opengl resource"))

@@ -246,6 +246,7 @@ A suitable image format will be selected based on attachment position."
 (defmethod print-object ((obj attachment) out)
   (print-unreadable-object
    (obj out :type t)
-   (format out "~a ~a"
-	   (attach-pos obj)
+   (format out "~a ~a ~a"
+	   (attachment-position obj)
+	   (attachment-type obj)
 	   (resource obj))))

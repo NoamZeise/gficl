@@ -72,12 +72,13 @@ uniform sampler2D tex;
 uniform float near;
 uniform float far;
 uniform int shadow_mode;
-#define MODE_MAP 0
+#define MODE_BASIC 0
+#define MODE_PCF 1
 #define MODE_VSM 2
 void main() { 
   if(uv.x > 1 || uv.y > 1 || uv.x < 0 || uv.y < 0) discard;
   colour = vec4(1);
-  if(shadow_mode == MODE_MAP) {
+  if(shadow_mode == MODE_BASIC || shadow_mode == MODE_PCF) {
     float d = texture(tex, uv).r;
     d = (2 * near) / (far + near - d * (far - near));  
     colour = vec4(vec3(d), 1);
@@ -247,10 +248,9 @@ void main() {
 ;; framebuffers
 (defparameter *fb* nil)
 ;; shadow implementations
-(defparameter *basic-shadow* nil)
-(defparameter *vsm-shadow* nil)
-;; active shadow impl
 (defparameter *current-shadow-mode* nil)
+(defparameter *next-shadow-modes* nil)
+(defparameter *shadow-modes* nil)
 ;; camera
 (defparameter *forward* nil)
 (defparameter *position* nil)
@@ -312,8 +312,7 @@ void main() {
 
 (defun set-light-projection (proj far-max bias)
   (setf *light-proj* proj)
-  (set-shader-mat *basic-shadow* "projection" *light-proj*)
-  (set-shader-mat *vsm-shadow* "projection" *light-proj*)
+  (set-shader-mat *current-shadow-mode* "projection" *light-proj*)
   
   (gficl:bind-gl *debug-shader*)
   (gl:uniformf (gficl:shader-loc *debug-shader* "near") 1)
@@ -335,8 +334,7 @@ void main() {
 (defun update-light-pos ()
   (setf *light-view*
 	(gficl:view-matrix *light-pos* (gficl:-vec '(0 -4 0) *light-pos*) *world-up*))
-  (set-shader-mat *vsm-shadow* "view" *light-view*)
-  (set-shader-mat *basic-shadow* "view" *light-view*)
+  (set-shader-mat *current-shadow-mode* "view" *light-view*)
   (update-light-vp)
   (gficl:bind-vec *main-shader* "light_pos" *light-pos*))
 
@@ -367,7 +365,13 @@ void main() {
     (gficl:map-keys-pressed
      (:escape (glfw:set-window-should-close))
      (:f (gficl:toggle-fullscreen))
-     (:x (setf *cam-move* (not *cam-move*))))    
+     (:x (setf *cam-move* (not *cam-move*)))
+     (:m (if (equalp *next-shadow-modes* nil) (setf *next-shadow-modes* *shadow-modes*))
+	 (setf *current-shadow-mode* (car *next-shadow-modes*))
+	 (setf *next-shadow-modes* (cdr *next-shadow-modes*))
+	 (set-shader-mat *current-shadow-mode* "view" *light-view*)
+	 (set-shader-mat *current-shadow-mode* "projection" *light-proj*)
+	 (format t "~a~%" *current-shadow-mode*)))
     (gficl:map-keys-down
      (:up (setf *position*   (gficl:+vec *position* (gficl:*vec (*  0.2 dt) *forward*))))	
      (:down (setf *position* (gficl:+vec *position* (gficl:*vec (* -0.2 dt) *forward*))))
@@ -417,17 +421,21 @@ void main() {
 
 (defconstant +basic-shadow-mode+ 0)
 (defclass basic-shadow (shadow-alg)
-  ((fb :initarg :fb)))
+  ((fb :initarg :fb))
+  (:documentation "A classic shadow map"))
 
-(defun make-basic-shadow (map-size)
+(defun basic-map-setup (map-size class mode-number)
   (let ((fb (gficl:make-framebuffer
 	     (list (gficl:make-attachment-description :depth-attachment :type :texture))
 	     map-size map-size))
 	(shader (gficl:make-shader *shadow-vert* *shadow-frag*)))
     (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id fb 0))
     (gl:tex-parameter :texture-2d :texture-compare-mode :compare-ref-to-texture)
-    (make-instance 'basic-shadow :mode-number +basic-shadow-mode+
+    (make-instance class :mode-number mode-number
 		   :fb fb :shader shader :map-size map-size)))
+
+(defun make-basic-shadow (map-size)
+  (basic-map-setup map-size 'basic-shadow +basic-shadow-mode+))
 
 (defmethod destroy-map ((sh basic-shadow))
 	   (gficl:delete-gl (slot-value sh 'shader))
@@ -452,6 +460,14 @@ void main() {
 	   (gl:bind-texture :texture-2d (get-shadow-map sh))
 	   (call-next-method))
 
+(defconstant +pcf-shadow-mode+ 1)
+(defclass pcf-shadow (basic-shadow)
+  () (:documentation "
+Percentage-Close filtering - Sample the shadow map at multiple points to find the average occluder coverage of a fragment"))
+
+(defun make-pcf-shadow (map-size)
+  (basic-map-setup map-size 'pcf-shadow +pcf-shadow-mode+))
+
 (defconstant +vsm-shadow-mode+ 2)
 (defclass vsm-shadow (shadow-alg)
   ((ms-fb :initarg :ms-fb)
@@ -461,11 +477,11 @@ void main() {
   (let
       ((ms-fb
 	(gficl:make-framebuffer (list (gficl:make-attachment-description
-					 :color-attachment0
-					 :internal-format :rgba32f)
-					(gficl:make-attachment-description :depth-attachment))
-				  +shadow-map-size+ +shadow-map-size+
-				  :samples samples))
+				       :color-attachment0
+				       :internal-format :rgba32f)
+				      (gficl:make-attachment-description :depth-attachment))
+				+shadow-map-size+ +shadow-map-size+
+				:samples samples))
        (resolve-fb (gficl:make-framebuffer
 		    (list (gficl:make-attachment-description :color-attachment0
 							     :internal-format :rgba32f
@@ -618,9 +634,12 @@ void main() {
   (setup-globals)
   (setup-render-objects)
   (let ((samples (min +max-samples+ (gl:get-integer :max-samples))))
-    (setf *vsm-shadow* (make-vsm-shadow +shadow-map-size+ samples))
-    (setf *basic-shadow* (make-basic-shadow +shadow-map-size+)))
-  (setf *current-shadow-mode* *vsm-shadow*)
+    (setf *shadow-modes*
+	  (list (make-basic-shadow +shadow-map-size+)
+		(make-pcf-shadow +shadow-map-size+)
+		(make-vsm-shadow +shadow-map-size+ samples))))
+  (setf *current-shadow-mode* (caddr *shadow-modes*))
+  (setf *next-shadow-modes* (cdr *shadow-modes*))
   (setup-shaders)
   (resize (gficl:window-width) (gficl:window-height))
   (gl:enable :cull-face)
@@ -635,7 +654,6 @@ void main() {
   
   (gficl:delete-gl *main-shader*)
   (gficl:delete-gl *debug-shader*)
-
-  (destroy-map *basic-shadow*)
-  (destroy-map *vsm-shadow*)
+  (loop for map in *shadow-modes* do
+	(destroy-map map))
   (gficl:delete-gl *fb*))
