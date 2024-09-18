@@ -131,10 +131,6 @@ uniform int shadow_mode;
 #define MODE_PCF 1
 #define MODE_VSM 2
 
-float random(vec2 co) {
-   return fract(sin(dot(co.xy,vec2(12.9898,78.233))) * 43758.5453);
-}
-
 vec3 correct_light_pos() {
   vec4 p = light_space_pos;
   p /= p.w;
@@ -153,6 +149,10 @@ float single_sample_shadow(vec3 n, vec3 l) {
   float bias = 0.000001 * bias_factor
              + 0.000005  * bias_factor * (1.0 - dot(n, -l));
   return test_shadow(pos, vec2(0, 0), bias);
+}
+
+float random(vec2 co) {
+   return fract(sin(dot(co.xy,vec2(12.9898,78.233))) * 43758.5453);
 }
 
 float pcf_shadow(vec3 n, vec3 l) {
@@ -304,263 +304,6 @@ void main() {
 (defun load-model (path)
   (car (gficl/load:model path :vertex-form '(:position :normal))))
 
-;;; ---- Update ----
-
-(defun update-light-vp ()
-  (gficl:bind-gl *main-shader*)
-  (gficl:bind-matrix *main-shader* "light_view_proj" (gficl:*mat *light-proj* *light-view*)))
-
-(defun set-light-projection (proj far-max bias)
-  (setf *light-proj* proj)
-  (set-shader-mat *current-shadow-mode* "projection" *light-proj*)
-  
-  (gficl:bind-gl *debug-shader*)
-  (gl:uniformf (gficl:shader-loc *debug-shader* "near") 1)
-  (gl:uniformf (gficl:shader-loc *debug-shader* "far") far-max)
-  
-  (gficl:bind-gl *main-shader*)
-  (gl:uniformf (gficl:shader-loc *main-shader* "bias_factor") bias)
-  (update-light-vp))
-
-(defun toggle-light-projection-mode ()
-  "Switch between Orthographic and Perspective shadow map light mode."
-  (setf *light-ortho-mode* (not *light-ortho-mode*))
-  (if *light-ortho-mode*
-      (set-light-projection (gficl:orthographic-matrix 8 -4 -4 4 0 -50) 5 20)
-    (let* ((near 0.5) (edge (* near (tan (/ pi 6.0))))
-	   (mat (gficl:perspective-matrix edge (- edge) (- edge) edge near)))
-      (set-light-projection mat 50 1))))
-
-(defun update-light-pos ()
-  (setf *light-view*
-	(gficl:view-matrix *light-pos* (gficl:-vec '(0 -4 0) *light-pos*) *world-up*))
-  (set-shader-mat *current-shadow-mode* "view" *light-view*)
-  (update-light-vp)
-  (gficl:bind-vec *main-shader* "light_pos" *light-pos*))
-
-(defun light-controls (dt)
-  (let ((speed (* 10 dt)))
-    (gficl:map-keys-down
-     (:w (setf *light-pos* (gficl:+vec *light-pos* (list speed 0 0))))
-     (:s (setf *light-pos* (gficl:+vec *light-pos* (list (* -1 speed) 0 0))))
-     (:a (setf *light-pos* (gficl:+vec *light-pos* (list 0 0 speed))))
-     (:d (setf *light-pos* (gficl:+vec *light-pos* (list 0 0 (* -1 speed)))))))
-  (gficl:map-keys-pressed
-   (:z (toggle-light-projection-mode)))
-  (update-light-pos))
-
-(defun update-view (dt)
-  (if *cam-move*
-      (setf *position*
-	    (gficl:quat-conjugate-vec (gficl:make-unit-quat (* 0.1 dt) *world-up*) *position*)))
-  (setf *forward* (gficl:-vec *target* *position*))
-  (setf *view* (gficl:view-matrix *position* *forward* *world-up*))
-  (set-model-mat *light-ro* (gficl:translation-matrix *light-pos*))
-  (gficl:bind-gl *main-shader*)
-  (gficl:bind-matrix *main-shader* "view" *view*)
-  (gficl:bind-vec *main-shader* "cam" *position*))
-
-(defun update ()
-  (gficl:with-update (dt)    
-    (gficl:map-keys-pressed
-     (:escape (glfw:set-window-should-close))
-     (:f (gficl:toggle-fullscreen))
-     (:x (setf *cam-move* (not *cam-move*)))
-     (:m (if (equalp *next-shadow-modes* nil) (setf *next-shadow-modes* *shadow-modes*))
-	 (setf *current-shadow-mode* (car *next-shadow-modes*))
-	 (setf *next-shadow-modes* (cdr *next-shadow-modes*))
-	 (set-shader-mat *current-shadow-mode* "view" *light-view*)
-	 (set-shader-mat *current-shadow-mode* "projection" *light-proj*)
-	 (format t "~a~%" *current-shadow-mode*)))
-    (gficl:map-keys-down
-     (:up (setf *position*   (gficl:+vec *position* (gficl:*vec (*  0.2 dt) *forward*))))	
-     (:down (setf *position* (gficl:+vec *position* (gficl:*vec (* -0.2 dt) *forward*))))
-     (:space
-      (setf *position*
-	    (gficl:+vec *position*
-			(gficl:*vec (* 0.3 dt (gficl:magnitude *forward*)) *world-up*))))
-     (:left-shift
-      (setf *position*
-	    (gficl:+vec *position*
-			(gficl:*vec (* -0.3 dt (gficl:magnitude *forward*)) *world-up*)))))
-    (light-controls dt)
-    (update-view dt)))
-
-;;; ---- Draw ----
-
-(defgeneric shadow-pass (sh)
-  (:documentation "called before occluder pass"))
-
-(defgeneric main-draw-setup (sh)
-	    (:documentation "setup main shader uniforms"))
-
-(defgeneric destroy-map (sh)
-	    (:documentation "destroy resources used by shadow map method"))
-
-(defgeneric set-shader-mat (sh uniform-name mat)
-	    (:documentation "set a matrix in the shadow shader"))
-
-(defgeneric get-shadow-map (sh)
-	    (:documentation "get shadow map texture id"))
-
-(defclass shadow-alg ()
-  ((shader :initarg :shader)
-   (map-size :initarg :map-size)
-   (mode-number :initarg :mode-number :accessor shadow-mode)))
-
-(defmethod set-shader-mat ((sh shadow-alg) uniform-name mat)
-	   (gficl:bind-gl (slot-value sh 'shader))
-	   (gficl:bind-matrix (slot-value sh 'shader) uniform-name mat))
-
-(defmethod shadow-pass ((sh shadow-alg))
-	   (gficl:bind-gl (slot-value sh 'shader))
-	   (let ((size (slot-value sh 'map-size))) (gl:viewport 0 0 size size)))
-
-(defmethod main-draw-setup ((sh shadow-alg))
-	   (gl:uniformi (gficl:shader-loc *main-shader* "shadow_mode") (shadow-mode sh)))
-
-(defconstant +basic-shadow-mode+ 0)
-(defclass basic-shadow (shadow-alg)
-  ((fb :initarg :fb))
-  (:documentation "A classic shadow map"))
-
-(defun basic-map-setup (map-size class mode-number)
-  (let ((fb (gficl:make-framebuffer
-	     (list (gficl:make-attachment-description :depth-attachment :type :texture))
-	     map-size map-size))
-	(shader (gficl:make-shader *shadow-vert* *shadow-frag*)))
-    (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id fb 0))
-    (gl:tex-parameter :texture-2d :texture-compare-mode :compare-ref-to-texture)
-    (make-instance class :mode-number mode-number
-		   :fb fb :shader shader :map-size map-size)))
-
-(defun make-basic-shadow (map-size)
-  (basic-map-setup map-size 'basic-shadow +basic-shadow-mode+))
-
-(defmethod destroy-map ((sh basic-shadow))
-	   (gficl:delete-gl (slot-value sh 'shader))
-	   (gficl:delete-gl (slot-value sh 'fb)))
-
-(defmethod get-shadow-map ((sh basic-shadow))
-	   (gficl:framebuffer-texture-id (slot-value sh 'fb) 0))
-
-(defmethod shadow-pass ((sh basic-shadow))
-	   (let ((shader (slot-value sh 'shader)))
-	     (gficl:bind-gl (slot-value sh 'fb))
-	     (gl:enable :depth-test)
-	     (gl:disable :multisample)
-	     (gl:clear :depth-buffer)
-	     (call-next-method)
-	     (draw-render-obj-shadow *bunny* shader)
-	     (draw-render-obj-shadow *cube* shader)
-	     (draw-render-obj-shadow *sphere* shader)))
-
-(defmethod main-draw-setup ((sh basic-shadow))
-	   (gl:active-texture :texture0)
-	   (gl:bind-texture :texture-2d (get-shadow-map sh))
-	   (call-next-method))
-
-(defconstant +pcf-shadow-mode+ 1)
-(defclass pcf-shadow (basic-shadow)
-  () (:documentation "
-Percentage-Close filtering - Sample the shadow map at multiple points to find the average occluder coverage of a fragment"))
-
-(defun make-pcf-shadow (map-size)
-  (basic-map-setup map-size 'pcf-shadow +pcf-shadow-mode+))
-
-(defconstant +vsm-shadow-mode+ 2)
-(defclass vsm-shadow (shadow-alg)
-  ((ms-fb :initarg :ms-fb)
-   (resolve-fb :initarg :resolve-fb)))
-
-(defun make-vsm-shadow (map-size samples)
-  (let
-      ((ms-fb
-	(gficl:make-framebuffer (list (gficl:make-attachment-description
-				       :color-attachment0
-				       :internal-format :rgba32f)
-				      (gficl:make-attachment-description :depth-attachment))
-				+shadow-map-size+ +shadow-map-size+
-				:samples samples))
-       (resolve-fb (gficl:make-framebuffer
-		    (list (gficl:make-attachment-description :color-attachment0
-							     :internal-format :rgba32f
-							     :type :texture))
-		    map-size map-size))
-       (shader (gficl:make-shader *vsm-vert* *vsm-frag*)))
-    (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id resolve-fb 0))
-    (gl:tex-parameter :texture-2d :texture-min-filter :linear)
-    (gl:tex-parameter :texture-2d :texture-mag-filter :linear)
-    (make-instance 'vsm-shadow
-		   :mode-number +vsm-shadow-mode+
-		   :ms-fb ms-fb :resolve-fb resolve-fb :shader shader :map-size map-size)))
-
-(defmethod destroy-map ((sh vsm-shadow))
-	   (gficl:delete-gl (slot-value sh 'ms-fb))
-	   (gficl:delete-gl (slot-value sh 'resolve-fb))
-	   (gficl:delete-gl (slot-value sh 'shader)))
-
-(defmethod get-shadow-map ((sh vsm-shadow))
-	   (gficl:framebuffer-texture-id (slot-value sh 'resolve-fb) 0))
-
-(defmethod shadow-pass ((sh vsm-shadow))
-	   (let ((shader (slot-value sh 'shader))
-		 (size (slot-value sh 'map-size)))
-	     (gficl:bind-gl (slot-value sh 'ms-fb))
-	     (gl:enable :depth-test :multisample)
-	     (gl:clear-color 1.0 1.0 0 0)
-	     (gl:clear :color-buffer :depth-buffer)
-	     (call-next-method)
-	     (draw-render-obj-shadow *bunny* shader)
-	     (draw-render-obj-shadow *cube* shader)
-	     (draw-render-obj-shadow *sphere* shader)
-	     (draw-render-obj-shadow *plane* shader)
-	     (gficl:blit-framebuffers
-	      (slot-value sh 'ms-fb) (slot-value sh 'resolve-fb) size size)
-	     (gl:bind-texture :texture-2d (get-shadow-map sh))
-	     (gl:generate-mipmap :texture-2d)))
-
-(defmethod main-draw-setup ((sh vsm-shadow))
-	   (gl:active-texture :texture1)
-	   (gl:bind-texture :texture-2d (get-shadow-map sh))
-	   (call-next-method))
-
-(defun draw-debug ()
-  (gficl:bind-gl *debug-shader*)
-  (gl:active-texture :texture0)
-  (gl:bind-texture :texture-2d (get-shadow-map *current-shadow-mode*))
-  (gl:uniformi (gficl:shader-loc *debug-shader* "shadow_mode")
-	       (shadow-mode *current-shadow-mode*))
-  (gficl:bind-gl *dummy-data*)
-  (gl:draw-arrays :triangles 0 3))
-
-(defun draw-main-scene ()
-  (gficl:bind-gl *main-shader*)
-  (gl:enable :depth-test)
-  (gl:uniformi (gficl:shader-loc *main-shader* "shaded") 1)
-  (main-draw-setup *current-shadow-mode*)
-  (draw-render-obj *bunny*)
-  (draw-render-obj *cube*)
-  (draw-render-obj *sphere*)
-  (draw-render-obj *plane*)
-  (gl:uniformi (gficl:shader-loc *main-shader* "shaded") 0)
-  (draw-render-obj *light-ro*))
-
-(defun draw-main-pass ()
-  (gficl:bind-gl *fb*)
-  (gl:enable :multisample)
-  (gl:clear-color 0.8 0.5 0 0)
-  (gl:clear :color-buffer :depth-buffer)
-  (gl:viewport 0 0 (gficl:window-width) (gficl:window-height))
-  (draw-debug)
-  (draw-main-scene)
-  (gficl:blit-framebuffers *fb* 0 (gficl:window-width) (gficl:window-height)))
-
-(defun draw ()
-  (gficl:with-render
-   (shadow-pass *current-shadow-mode*)
-   (draw-main-pass)))
-
 ;;; ---- Setup / Cleanup ----
 
 (defun setup-globals ()
@@ -657,3 +400,273 @@ Percentage-Close filtering - Sample the shadow map at multiple points to find th
   (loop for map in *shadow-modes* do
 	(destroy-map map))
   (gficl:delete-gl *fb*))
+
+;;; ---- Update ----
+
+(defun update-light-vp ()
+  (gficl:bind-gl *main-shader*)
+  (gficl:bind-matrix *main-shader* "light_view_proj" (gficl:*mat *light-proj* *light-view*)))
+
+(defun set-light-projection (proj far-max bias)
+  (setf *light-proj* proj)
+  (set-shader-mat *current-shadow-mode* "projection" *light-proj*)
+  
+  (gficl:bind-gl *debug-shader*)
+  (gl:uniformf (gficl:shader-loc *debug-shader* "near") 1)
+  (gl:uniformf (gficl:shader-loc *debug-shader* "far") far-max)
+  
+  (gficl:bind-gl *main-shader*)
+  (gl:uniformf (gficl:shader-loc *main-shader* "bias_factor") bias)
+  (update-light-vp))
+
+(defun toggle-light-projection-mode ()
+  "Switch between Orthographic and Perspective shadow map light mode."
+  (setf *light-ortho-mode* (not *light-ortho-mode*))
+  (if *light-ortho-mode*
+      (set-light-projection (gficl:orthographic-matrix 8 -4 -4 4 0 -50) 5 20)
+    (let* ((near 0.5) (edge (* near (tan (/ pi 6.0))))
+	   (mat (gficl:perspective-matrix edge (- edge) (- edge) edge near)))
+      (set-light-projection mat 50 1))))
+
+(defun update-light-pos ()
+  (setf *light-view*
+	(gficl:view-matrix *light-pos* (gficl:-vec '(0 -4 0) *light-pos*) *world-up*))
+  (set-shader-mat *current-shadow-mode* "view" *light-view*)
+  (update-light-vp)
+  (gficl:bind-vec *main-shader* "light_pos" *light-pos*))
+
+(defun light-controls (dt)
+  (let ((speed (* 10 dt)))
+    (gficl:map-keys-down
+     (:w (setf *light-pos* (gficl:+vec *light-pos* (list speed 0 0))))
+     (:s (setf *light-pos* (gficl:+vec *light-pos* (list (* -1 speed) 0 0))))
+     (:a (setf *light-pos* (gficl:+vec *light-pos* (list 0 0 speed))))
+     (:d (setf *light-pos* (gficl:+vec *light-pos* (list 0 0 (* -1 speed)))))))
+  (gficl:map-keys-pressed
+   (:z (toggle-light-projection-mode)))
+  (update-light-pos))
+
+(defun update-view (dt)
+  (if *cam-move*
+      (setf *position*
+	    (gficl:quat-conjugate-vec (gficl:make-unit-quat (* 0.1 dt) *world-up*) *position*)))
+  (setf *forward* (gficl:-vec *target* *position*))
+  (setf *view* (gficl:view-matrix *position* *forward* *world-up*))
+  (set-model-mat *light-ro* (gficl:translation-matrix *light-pos*))
+  (gficl:bind-gl *main-shader*)
+  (gficl:bind-matrix *main-shader* "view" *view*)
+  (gficl:bind-vec *main-shader* "cam" *position*))
+
+(defun update ()
+  (gficl:with-update (dt)    
+    (gficl:map-keys-pressed
+     (:escape (glfw:set-window-should-close))
+     (:f (gficl:toggle-fullscreen))
+     (:x (setf *cam-move* (not *cam-move*)))
+     (:m (if (equalp *next-shadow-modes* nil) (setf *next-shadow-modes* *shadow-modes*))
+	 (setf *current-shadow-mode* (car *next-shadow-modes*))
+	 (setf *next-shadow-modes* (cdr *next-shadow-modes*))
+	 (set-shader-mat *current-shadow-mode* "view" *light-view*)
+	 (set-shader-mat *current-shadow-mode* "projection" *light-proj*)
+	 (format t "~a~%" *current-shadow-mode*)))
+    (gficl:map-keys-down
+     (:up (setf *position*   (gficl:+vec *position* (gficl:*vec (*  0.2 dt) *forward*))))	
+     (:down (setf *position* (gficl:+vec *position* (gficl:*vec (* -0.2 dt) *forward*))))
+     (:space
+      (setf *position*
+	    (gficl:+vec *position*
+			(gficl:*vec (* 0.3 dt (gficl:magnitude *forward*)) *world-up*))))
+     (:left-shift
+      (setf *position*
+	    (gficl:+vec *position*
+			(gficl:*vec (* -0.3 dt (gficl:magnitude *forward*)) *world-up*)))))
+    (light-controls dt)
+    (update-view dt)))
+
+;;; --- Shadow Pass Classes ---
+
+(defgeneric shadow-pass (sh)
+	    (:documentation "called before occluder pass"))
+
+(defgeneric main-draw-setup (sh)
+	    (:documentation "setup main shader uniforms"))
+
+(defgeneric destroy-map (sh)
+	    (:documentation "destroy resources used by shadow map method"))
+
+(defgeneric set-shader-mat (sh uniform-name mat)
+	    (:documentation "set a matrix in the shadow shader"))
+
+(defgeneric get-shadow-map (sh)
+	    (:documentation "get shadow map texture id"))
+
+(defclass shadow-alg ()
+  ((shader)
+   (map-size :initarg :map-size)
+   (mode-number :initarg :mode-number :accessor shadow-mode)))
+
+(defmethod set-shader-mat ((sh shadow-alg) uniform-name mat)
+	   (gficl:bind-gl (slot-value sh 'shader))
+	   (gficl:bind-matrix (slot-value sh 'shader) uniform-name mat))
+
+(defmethod shadow-pass ((sh shadow-alg))
+	   (gficl:bind-gl (slot-value sh 'shader))
+	   (let ((size (slot-value sh 'map-size))) (gl:viewport 0 0 size size)))
+
+(defmethod main-draw-setup ((sh shadow-alg))
+	   (gl:uniformi (gficl:shader-loc *main-shader* "shadow_mode") (shadow-mode sh)))
+
+(defmethod destroy-map ((sh shadow-alg))
+	   (gficl:delete-gl (slot-value sh 'shader)))
+
+(defconstant +basic-shadow-mode+ 0)
+(defclass basic-shadow (shadow-alg)
+  ((fb))
+  (:documentation "A classic shadow map"))
+
+(defmethod initialize-instance :after ((instance basic-shadow) &key &allow-other-keys)
+	   (let ((fb (with-slots (map-size) instance
+		       (gficl:make-framebuffer
+			(list (gficl:make-attachment-description :depth-attachment :type :texture))
+			map-size map-size)))
+		 (shader (gficl:make-shader *shadow-vert* *shadow-frag*)))
+	     (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id fb 0))
+	     (gl:tex-parameter :texture-2d :texture-compare-mode :compare-ref-to-texture)
+	     (with-slots ((f fb) (s shader)) instance
+	       (setf f fb) (setf s shader))))
+
+(defun make-basic-shadow (map-size)
+  (make-instance 'basic-shadow :mode-number +basic-shadow-mode+ :map-size map-size))
+
+(defmethod destroy-map ((sh basic-shadow))	   
+	   (gficl:delete-gl (slot-value sh 'fb))
+	   (call-next-method))
+
+(defmethod get-shadow-map ((sh basic-shadow))
+	   (gficl:framebuffer-texture-id (slot-value sh 'fb) 0))
+
+(defmethod shadow-pass ((sh basic-shadow))
+	   (with-slots (shader fb) sh
+	     (gficl:bind-gl fb)
+	     (gl:enable :depth-test)
+	     (gl:disable :multisample)
+	     (gl:clear :depth-buffer)
+	     (call-next-method)
+	     (draw-render-obj-shadow *bunny* shader)
+	     (draw-render-obj-shadow *cube* shader)
+	     (draw-render-obj-shadow *sphere* shader)))
+
+(defmethod main-draw-setup ((sh basic-shadow))
+	   (gl:active-texture :texture0)
+	   (gl:bind-texture :texture-2d (get-shadow-map sh))
+	   (call-next-method))
+
+(defconstant +pcf-shadow-mode+ 1)
+(defclass pcf-shadow (basic-shadow)
+  () (:documentation "
+Percentage-Close filtering - Sample the shadow map at multiple points to find the average occluder coverage of a fragment"))
+
+(defun make-pcf-shadow (map-size)
+  (make-instance 'pcf-shadow :mode-number +pcf-shadow-mode+ :map-size map-size))
+
+(defconstant +vsm-shadow-mode+ 2)
+(defclass vsm-shadow (shadow-alg)
+  ((ms-fb :initarg :ms-fb)
+   (resolve-fb :initarg :resolve-fb)
+   (samples :initarg :samples)))
+
+(defmethod initialize-instance :after ((instance vsm-shadow) &key &allow-other-keys)
+	   (with-slots (map-size samples) instance
+	     (let
+		 ((ms-fb
+		   (gficl:make-framebuffer
+		    (list (gficl:make-attachment-description
+			   :color-attachment0
+			   :internal-format :rgba32f)
+			  (gficl:make-attachment-description
+			   :depth-attachment))
+		    map-size map-size
+		    :samples samples))
+		  (resolve-fb
+		   (gficl:make-framebuffer
+		    (list (gficl:make-attachment-description
+			   :color-attachment0
+			   :internal-format :rgba32f
+			   :type :texture))
+		    map-size map-size))
+		  (shader (gficl:make-shader *vsm-vert* *vsm-frag*)))
+	       (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id resolve-fb 0))
+	       (gl:tex-parameter :texture-2d :texture-min-filter :linear)
+	       (gl:tex-parameter :texture-2d :texture-mag-filter :linear)
+	       (with-slots ((mf ms-fb) (f resolve-fb) (s shader)) instance
+		   (setf mf ms-fb) (setf f resolve-fb) (setf s shader)))))
+
+(defun make-vsm-shadow (map-size samples)
+  (make-instance 'vsm-shadow :mode-number +vsm-shadow-mode+ :map-size map-size :samples samples))
+
+(defmethod destroy-map ((sh vsm-shadow))
+	   (with-slots (ms-fb resolve-fb shader) sh
+	     (gficl:delete-gl ms-fb)
+	     (gficl:delete-gl resolve-fb)
+	     (call-next-method)))
+
+(defmethod get-shadow-map ((sh vsm-shadow))
+	   (gficl:framebuffer-texture-id (slot-value sh 'resolve-fb) 0))
+
+(defmethod shadow-pass ((sh vsm-shadow))
+	   (with-slots (shader (size map-size) ms-fb resolve-fb) sh
+	     (gficl:bind-gl ms-fb)
+	     (gl:enable :depth-test :multisample)
+	     (gl:clear-color 1.0 1.0 0 0)
+	     (gl:clear :color-buffer :depth-buffer)
+	     (call-next-method)
+	     (draw-render-obj-shadow *bunny* shader)
+	     (draw-render-obj-shadow *cube* shader)
+	     (draw-render-obj-shadow *sphere* shader)
+	     (draw-render-obj-shadow *plane* shader)
+	     (gficl:blit-framebuffers ms-fb resolve-fb size size)
+	     (gl:bind-texture :texture-2d (get-shadow-map sh))
+	     (gl:generate-mipmap :texture-2d)))
+
+(defmethod main-draw-setup ((sh vsm-shadow))
+	   (gl:active-texture :texture1)
+	   (gl:bind-texture :texture-2d (get-shadow-map sh))
+	   (call-next-method))
+
+;;; ---- Draw ----
+
+(defun draw-debug ()
+  (gficl:bind-gl *debug-shader*)
+  (gl:active-texture :texture0)
+  (gl:bind-texture :texture-2d (get-shadow-map *current-shadow-mode*))
+  (gl:uniformi (gficl:shader-loc *debug-shader* "shadow_mode")
+	       (shadow-mode *current-shadow-mode*))
+  (gficl:bind-gl *dummy-data*)
+  (gl:draw-arrays :triangles 0 3))
+
+(defun draw-main-scene ()
+  (gficl:bind-gl *main-shader*)
+  (gl:enable :depth-test)
+  (gl:uniformi (gficl:shader-loc *main-shader* "shaded") 1)
+  (main-draw-setup *current-shadow-mode*)
+  (draw-render-obj *bunny*)
+  (draw-render-obj *cube*)
+  (draw-render-obj *sphere*)
+  (draw-render-obj *plane*)
+  (gl:uniformi (gficl:shader-loc *main-shader* "shaded") 0)
+  (draw-render-obj *light-ro*))
+
+(defun draw-main-pass ()
+  (gficl:bind-gl *fb*)
+  (gl:enable :multisample)
+  (gl:clear-color 0.8 0.5 0 0)
+  (gl:clear :color-buffer :depth-buffer)
+  (gl:viewport 0 0 (gficl:window-width) (gficl:window-height))
+  (draw-debug)
+  (draw-main-scene)
+  (gficl:blit-framebuffers *fb* 0 (gficl:window-width) (gficl:window-height)))
+
+(defun draw ()
+  (gficl:with-render
+   (shadow-pass *current-shadow-mode*)
+   (draw-main-pass)))
