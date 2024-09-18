@@ -2,18 +2,17 @@
 
 ;;; Shadow Mapping Example
 ;;; ----------------------
-;;; Use Z to switch between a perspective and orthographic
-;;; Projection Mode for the shadow map.
-;;;
-;;; Use WASD to change the light position
-;;; and UP/DOWN/SPACE/SHIFT keys to change the camera position
-;;;
-;;; Use X to toggle camera rotation
+;;; M - switch shadow map mode
+;;; X - toggle camera rotation
+;;; Z - switch between a perspective and orthographic projection for the shadow map
+;;; WASD - change light position
+;;; UP/DOWN/SPACE/SHIFT -  change camera position
 
+;;; 3d model data filepaths
 (defparameter *bunny-path* #p"examples/assets/bunny.obj")
 (defparameter *cube-path* #p"examples/assets/cube.obj")
 (defparameter *sphere-path* #p"examples/assets/sphere.obj")
-
+;;; 3d model hardcoded data
 (defparameter *plane-data*
 	      (list :verts '(((-1 0 -1) (0 1 0))
 			     ((1 0 -1) (0 1 0))
@@ -21,6 +20,7 @@
 			     ((-1 0 1) (0 1 0)))
 		    :indices '(0 3 2 2 1 0)))
 
+;;; shadow pass shaders
 (defparameter *shadow-vert* "
 #version 330
 layout (location = 0) in vec3 position;
@@ -57,6 +57,7 @@ void main() {
  colour = vec4(depth, depth*depth, 0, 1);
 }")
 
+;;; debug shader
 (defparameter *debug-vert*
 	      "#version 330
 out vec2 uv;
@@ -87,6 +88,7 @@ void main() {
     colour = texture(tex, uv).rgba;
   }
 }")
+;;; main shader
 (defparameter *main-vert-code*
 	      "#version 330
 layout (location = 0) in vec3 position;
@@ -231,23 +233,25 @@ void main() {
   if(in_shadow > 1) colour = vec4(1, 0, 0, 1);
 }")
 
-(defconstant +max-samples+ 8)
+;;; ---- Constants ----
+
 (defconstant +shadow-map-size+ 2048)
+(defconstant +max-samples+ 8)
 
 ;;; ---- Globals ----
 
-;; assets
+;; render objects
 (defparameter *bunny* nil)
 (defparameter *plane* nil)
 (defparameter *cube* nil)
 (defparameter *sphere* nil)
 (defparameter *dummy-data* nil)
-;; shaders
+;; main pass shaders
 (defparameter *main-shader* nil)
 (defparameter *debug-shader* nil)
-;; framebuffers
+;; main pass framebuffer
 (defparameter *fb* nil)
-;; shadow implementations
+;; shadow map implementations
 (defparameter *current-shadow-mode* nil)
 (defparameter *next-shadow-modes* nil)
 (defparameter *shadow-modes* nil)
@@ -265,7 +269,6 @@ void main() {
 (defparameter *light-view* nil)
 (defparameter *light-proj* nil)
 
-
 ;;; ---- Main ----
 
 (defun run ()
@@ -277,7 +280,7 @@ void main() {
 	 do (draw))
    (cleanup)))
 
-;;; ---- Render Object ----
+;;; ---- Render Object Class ----
 
 (defclass render-obj ()
   ((vertex-data :initarg :vertex-data :accessor vertex-data :type gficl:vertex-data)
@@ -306,8 +309,23 @@ void main() {
 
 ;;; ---- Setup / Cleanup ----
 
+(defun setup ()
+  (setup-globals)
+  (setup-render-objects)
+  (let ((samples (min +max-samples+ (gl:get-integer :max-samples))))
+    (setf *shadow-modes*
+	  (list (make-basic-shadow +shadow-map-size+)
+		(make-pcf-shadow +shadow-map-size+)
+		(make-vsm-shadow +shadow-map-size+ samples))))
+  (next-shadow-mode)
+  (setup-shaders)
+  (resize (gficl:window-width) (gficl:window-height))
+  (gl:enable :cull-face)
+  (gl:cull-face :front))
+
 (defun setup-globals ()
   (setf *fb* nil)
+  (setf *next-shadow-modes* nil)
   
   (setf *light-pos* (gficl:make-vec '(10 9 10)))
   (setf *cam-move* t)
@@ -343,6 +361,11 @@ void main() {
 	(gficl:make-vertex-data (gficl:make-vertex-form (list (gficl:make-vertex-slot 1 :int)))
 				'(((0))) '(0 0 0))))
 
+(defun setup-shaders ()
+  (setf *main-shader* (gficl:make-shader *main-vert-code* *main-frag-code*))
+  (setf *debug-shader* (gficl:make-shader *debug-vert* *debug-frag*))
+  (setup-shader-variables))
+
 (defun setup-shader-variables ()
   (gficl:bind-gl *debug-shader*)
   (gl:uniformi (gficl:shader-loc *debug-shader* "tex") 0)
@@ -356,12 +379,7 @@ void main() {
   (gl:uniformi (gficl:shader-loc *main-shader* "vsm_shadow_map") 1)
   (toggle-light-projection-mode)
   (update-light-pos)
-  (update-view 0))
-
-(defun setup-shaders ()
-  (setf *main-shader* (gficl:make-shader *main-vert-code* *main-frag-code*))
-  (setf *debug-shader* (gficl:make-shader *debug-vert* *debug-frag*))
-  (setup-shader-variables))
+  (update-camera 0))
 
 (defun resize (w h)
   (gficl:bind-gl *main-shader*)
@@ -372,21 +390,6 @@ void main() {
 	      (list (gficl:make-attachment-description :color-attachment0)
 		    (gficl:make-attachment-description :depth-stencil-attachment))
 	      w h :samples (min +max-samples+ (gl:get-integer :max-samples)))))
-
-(defun setup ()
-  (setup-globals)
-  (setup-render-objects)
-  (let ((samples (min +max-samples+ (gl:get-integer :max-samples))))
-    (setf *shadow-modes*
-	  (list (make-basic-shadow +shadow-map-size+)
-		(make-pcf-shadow +shadow-map-size+)
-		(make-vsm-shadow +shadow-map-size+ samples))))
-  (setf *current-shadow-mode* (caddr *shadow-modes*))
-  (setf *next-shadow-modes* (cdr *shadow-modes*))
-  (setup-shaders)
-  (resize (gficl:window-width) (gficl:window-height))
-  (gl:enable :cull-face)
-  (gl:cull-face :front))
 
 (defun cleanup ()
   (gficl:delete-gl (vertex-data *bunny*))
@@ -403,21 +406,51 @@ void main() {
 
 ;;; ---- Update ----
 
-(defun update-light-vp ()
-  (gficl:bind-gl *main-shader*)
-  (gficl:bind-matrix *main-shader* "light_view_proj" (gficl:*mat *light-proj* *light-view*)))
+(defun update ()
+  (gficl:with-update (dt)
+   (gficl:map-keys-pressed
+    (:escape (glfw:set-window-should-close))
+    (:f (gficl:toggle-fullscreen))
+    (:m (next-shadow-mode))
+    (:x (setf *cam-move* (not *cam-move*))))
+   (camera-controls dt)
+   (light-controls dt)))
 
-(defun set-light-projection (proj far-max bias)
-  (setf *light-proj* proj)
-  (set-shader-mat *current-shadow-mode* "projection" *light-proj*)
-  
-  (gficl:bind-gl *debug-shader*)
-  (gl:uniformf (gficl:shader-loc *debug-shader* "near") 1)
-  (gl:uniformf (gficl:shader-loc *debug-shader* "far") far-max)
-  
+(defun camera-controls (dt)
+  (gficl:map-keys-down
+   (:up (setf *position* (gficl:+vec *position* (gficl:*vec (*  0.2 dt) *forward*))))	
+   (:down (setf *position* (gficl:+vec *position* (gficl:*vec (* -0.2 dt) *forward*))))
+   (:space
+    (setf *position*
+	  (gficl:+vec *position*
+		      (gficl:*vec (* 0.3 dt (gficl:magnitude *forward*)) *world-up*))))
+   (:left-shift
+    (setf *position*
+	  (gficl:+vec *position*
+		      (gficl:*vec (* -0.3 dt (gficl:magnitude *forward*)) *world-up*)))))
+  (update-camera dt))
+
+(defun update-camera (dt)
+  (if *cam-move*
+      (setf *position*
+	    (gficl:quat-conjugate-vec (gficl:make-unit-quat (* 0.1 dt) *world-up*) *position*)))
+  (setf *forward* (gficl:-vec *target* *position*))
+  (setf *view* (gficl:view-matrix *position* *forward* *world-up*))
+  (set-model-mat *light-ro* (gficl:translation-matrix *light-pos*))
   (gficl:bind-gl *main-shader*)
-  (gl:uniformf (gficl:shader-loc *main-shader* "bias_factor") bias)
-  (update-light-vp))
+  (gficl:bind-matrix *main-shader* "view" *view*)
+  (gficl:bind-vec *main-shader* "cam" *position*))
+
+(defun light-controls (dt)
+  (let ((speed (* 10 dt)))
+    (gficl:map-keys-down
+     (:w (setf *light-pos* (gficl:+vec *light-pos* (list speed 0 0))))
+     (:s (setf *light-pos* (gficl:+vec *light-pos* (list (* -1 speed) 0 0))))
+     (:a (setf *light-pos* (gficl:+vec *light-pos* (list 0 0 speed))))
+     (:d (setf *light-pos* (gficl:+vec *light-pos* (list 0 0 (* -1 speed)))))))
+  (gficl:map-keys-pressed
+   (:z (toggle-light-projection-mode)))
+  (update-light-pos))
 
 (defun toggle-light-projection-mode ()
   "Switch between Orthographic and Perspective shadow map light mode."
@@ -435,53 +468,29 @@ void main() {
   (update-light-vp)
   (gficl:bind-vec *main-shader* "light_pos" *light-pos*))
 
-(defun light-controls (dt)
-  (let ((speed (* 10 dt)))
-    (gficl:map-keys-down
-     (:w (setf *light-pos* (gficl:+vec *light-pos* (list speed 0 0))))
-     (:s (setf *light-pos* (gficl:+vec *light-pos* (list (* -1 speed) 0 0))))
-     (:a (setf *light-pos* (gficl:+vec *light-pos* (list 0 0 speed))))
-     (:d (setf *light-pos* (gficl:+vec *light-pos* (list 0 0 (* -1 speed)))))))
-  (gficl:map-keys-pressed
-   (:z (toggle-light-projection-mode)))
-  (update-light-pos))
-
-(defun update-view (dt)
-  (if *cam-move*
-      (setf *position*
-	    (gficl:quat-conjugate-vec (gficl:make-unit-quat (* 0.1 dt) *world-up*) *position*)))
-  (setf *forward* (gficl:-vec *target* *position*))
-  (setf *view* (gficl:view-matrix *position* *forward* *world-up*))
-  (set-model-mat *light-ro* (gficl:translation-matrix *light-pos*))
+(defun set-light-projection (proj far-max bias)
+  (setf *light-proj* proj)
+  (set-shader-mat *current-shadow-mode* "projection" *light-proj*)
+  
+  (gficl:bind-gl *debug-shader*)
+  (gl:uniformf (gficl:shader-loc *debug-shader* "near") 1)
+  (gl:uniformf (gficl:shader-loc *debug-shader* "far") far-max)
+  
   (gficl:bind-gl *main-shader*)
-  (gficl:bind-matrix *main-shader* "view" *view*)
-  (gficl:bind-vec *main-shader* "cam" *position*))
+  (gl:uniformf (gficl:shader-loc *main-shader* "bias_factor") bias)
+  (update-light-vp))
 
-(defun update ()
-  (gficl:with-update (dt)    
-    (gficl:map-keys-pressed
-     (:escape (glfw:set-window-should-close))
-     (:f (gficl:toggle-fullscreen))
-     (:x (setf *cam-move* (not *cam-move*)))
-     (:m (if (equalp *next-shadow-modes* nil) (setf *next-shadow-modes* *shadow-modes*))
-	 (setf *current-shadow-mode* (car *next-shadow-modes*))
-	 (setf *next-shadow-modes* (cdr *next-shadow-modes*))
-	 (set-shader-mat *current-shadow-mode* "view" *light-view*)
-	 (set-shader-mat *current-shadow-mode* "projection" *light-proj*)
-	 (format t "~a~%" *current-shadow-mode*)))
-    (gficl:map-keys-down
-     (:up (setf *position*   (gficl:+vec *position* (gficl:*vec (*  0.2 dt) *forward*))))	
-     (:down (setf *position* (gficl:+vec *position* (gficl:*vec (* -0.2 dt) *forward*))))
-     (:space
-      (setf *position*
-	    (gficl:+vec *position*
-			(gficl:*vec (* 0.3 dt (gficl:magnitude *forward*)) *world-up*))))
-     (:left-shift
-      (setf *position*
-	    (gficl:+vec *position*
-			(gficl:*vec (* -0.3 dt (gficl:magnitude *forward*)) *world-up*)))))
-    (light-controls dt)
-    (update-view dt)))
+(defun update-light-vp ()
+  (gficl:bind-gl *main-shader*)
+  (gficl:bind-matrix *main-shader* "light_view_proj" (gficl:*mat *light-proj* *light-view*)))
+
+(defun next-shadow-mode ()
+  (if (equalp *next-shadow-modes* nil) (setf *next-shadow-modes* *shadow-modes*))
+  (setf *current-shadow-mode* (car *next-shadow-modes*))
+  (setf *next-shadow-modes* (cdr *next-shadow-modes*))
+  (if *light-view* (set-shader-mat *current-shadow-mode* "view" *light-view*))
+  (if *light-proj* (set-shader-mat *current-shadow-mode* "projection" *light-proj*))
+  (format t "Current Shadow Mode: ~a~%" *current-shadow-mode*))
 
 ;;; --- Shadow Pass Classes ---
 
@@ -573,7 +582,8 @@ Percentage-Close filtering - Sample the shadow map at multiple points to find th
 (defclass vsm-shadow (shadow-alg)
   ((ms-fb :initarg :ms-fb)
    (resolve-fb :initarg :resolve-fb)
-   (samples :initarg :samples)))
+   (samples :initarg :samples))
+  (:documentation "Variance Shadow Map - Uses a framebuffer with float components to render the depth and squared depth to."))
 
 (defmethod initialize-instance :after ((instance vsm-shadow) &key &allow-other-keys)
 	   (with-slots (map-size samples) instance
