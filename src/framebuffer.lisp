@@ -96,8 +96,7 @@ Must be manually freed with DELETE-GL.
 
 The index of a framebuffer attachment is equal to it's position in the ATTACHMENT-DESCRIPTIONS list.
 
-:draw-buffers is a list of DRAW-BUFFER items. If :draw-buffers is not supplied, 
-draw buffers will be all of the passed colour attachments."
+:draw-buffers is a list of DRAW-BUFFER items. If :draw-buffers is not supplied, draw buffers will be all of the passed colour attachments."
   (let ((id (gl:gen-framebuffer))
 	(draw-buffer-list draw-buffers)
 	(internal-attachments
@@ -131,8 +130,7 @@ draw buffers will be all of the passed colour attachments."
 (declaim (ftype (function (framebuffer integer) (values integer &optional)) framebuffer-attach-id))
 (defun framebuffer-texture-id (framebuffer index)
   "Return the texture id of the framebuffer attachment at index INDEX.
-Will signal an error if the index is out of range, or if the attachment
-at that index is not a texture attachment."
+Will signal an error if the index is out of range, or if the attachment at that index is not a texture attachment."
   (let ((attach (attachments framebuffer)))
     (dotimes (i index)
       (if (or (equalp attach nil) (equalp (cdr attach) nil))
@@ -147,9 +145,8 @@ at that index is not a texture attachment."
 		blit-framebuffers))	
 (defun blit-framebuffers (read-fb draw-fb width height &key	
 				  (buffer-list (list :color-buffer-bit)) (filter :nearest))
-  "blit framebuffers with same width and height, 
-such as for resolving a multisample framebuffer,
-pass 0 or nil as read-fb or draw-fb to use the backbuffer for a source or destination."
+  "blit framebuffers with same width and height, such as for resolving a multisample framebuffer.
+Pass 0 or nil as READ-FB or DRAW-FB to use the backbuffer as the blit source or destination respectively."
   (loop for b in buffer-list do
 	(assert (typep b 'buffer-mask) ()
 		"element ~a of buffer list is not a valid buffer mask: ~a"
