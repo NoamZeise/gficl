@@ -168,7 +168,7 @@ float pcf_shadow(vec3 n, vec3 l) {
   mat2 rot = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
   for(int x = 0; x < 3; x++)
     for(int y = 0; y < 3; y++)
-      s += test_shadow(pos, rot *((x-1) * vec2(D,0) 
+      s += test_shadow(pos, rot *((x-1) * vec2(D,0)
                                 + (y-1) * vec2(0,D)), bias) 
            * 1/9;
   return s;
@@ -181,6 +181,7 @@ float vsm_shadow(vec3 n, vec3 l) {
   float M1 = float_vec.x;
   float M2 = float_vec.y;
   if(depth <= M1) return 1.0;
+  // clamp variance to avoid numerical artifacts
   float s2 = max(abs(M2 - M1*M1), 0.000001);
   float diff = depth - M1;
   float pmax = s2 / (s2 + diff*diff);

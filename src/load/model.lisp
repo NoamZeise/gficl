@@ -12,6 +12,18 @@
 	 (get-vertex-form mesh vertex-form)
 	 (obj:vertex-data mesh) (obj:index-data mesh))))
 
+(defun test ()
+  (gltf:with-gltf (torus (probe-file #p"examples/assets/torus.glb"))
+		  (describe (gltf:buffers torus))
+		  (describe (gltf:buffer-views torus))
+		  (loop for mesh across (gltf:meshes torus) do
+			(loop for mp across (gltf:primitives mesh) do
+			      (loop for key being the hash-keys of (gltf:attributes mp)
+				    using (hash-value attribute) do
+				    (let ((view (gltf:buffer-view attribute)))
+				      (format t "~a:~%" key)
+				      (describe view))))))))))
+
 ;;; ---- helpers ----
 
 (defun get-vertex-form (mesh form)

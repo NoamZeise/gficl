@@ -24,7 +24,8 @@
 
 (defsystem :gficl/load
   :depends-on (:gficl
-	       :cl-wavefront)
+	       :cl-wavefront
+	       :cl-gltf)
   :components ((:module "src/load"
 		:components
 		((:file "package")

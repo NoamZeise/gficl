@@ -13,8 +13,6 @@
 (defexample quad-spin)
 (defexample cube-wave)
 (defexample post-processing)
-(defexample model-loading
-	    (:local-nicknames (#:obj #:org.shirakumo.fraf.wavefront)))
+(defexample model-loading)
 (defexample font)
-(defexample shadows
-	    (:local-nicknames (#:obj #:org.shirakumo.fraf.wavefront)))
+(defexample shadows)
