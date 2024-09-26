@@ -19,4 +19,5 @@
 		 (:file "post-processing")
 		 (:file "model-loading")
 		 (:file "font-rendering")
-		 (:file "shadows")))))
+		 (:file "shadows")
+		 (:file "pbr")))))

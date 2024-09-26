@@ -242,17 +242,21 @@ fov is in radians."
      (cffi:foreign-free ,var)))
 
 (defgeneric bind-matrix (shader name matrix)
-  (:documentation "set shader location with name to value of matrix"))
+  (:documentation "set shader location with name to value of matrix. Make sure the shader is bound before calling this function!"))
 
 (declaim (ftype (function (shader string matrix)) bind-matrix))
 (defmethod bind-matrix (shader name (matrix matrix))
   (with-foreign-matrix
    (ptr matrix)
    (let ((location (shader-loc shader name)))
-     (ecase (dimension matrix)
-	    (2 (%gl:uniform-matrix-2fv location 1 nil ptr))
-	    (3 (%gl:uniform-matrix-3fv location 1 nil ptr))
-	    (4 (%gl:uniform-matrix-4fv location 1 nil ptr))))))
+     (handler-case
+	 (ecase (dimension matrix)
+		(2 (%gl:uniform-matrix-2fv location 1 nil ptr))
+		(3 (%gl:uniform-matrix-3fv location 1 nil ptr))
+		(4 (%gl:uniform-matrix-4fv location 1 nil ptr)))
+       (gl:opengl-error (e)
+	 (error (format nil "~aError ~a when binding location ~a of shader ~a with matrix~%~a"
+			(unbound-shader-error-text shader) e name shader matrix)))))))
 
 ;;; --- helpers ---
 
@@ -263,4 +267,4 @@ fov is in radians."
 	  (loop for row in
 		(slot-value matrix 'data)
 		do (push (coerce (nth (- i 1) row) 'single-float) floats)))
-    (cffi:foreign-alloc :float :initial-contents (nreverse floats))))
+    (cffi:foreign-alloc :float :initial-contents (nreverse floats)))))

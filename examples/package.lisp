@@ -16,3 +16,4 @@
 (defexample model-loading)
 (defexample font)
 (defexample shadows)
+(defexample pbr)

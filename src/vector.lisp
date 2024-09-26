@@ -29,14 +29,19 @@
 (declaim (ftype (function (shader string vec)) internal-bind-vec))
 (defun internal-bind-vec (shader name vec)
   (let ((location (shader-loc shader name)))
-    (ecase (dimension vec)
-	   (1 (%gl:uniform-1f location (vec-ref vec 0)))
-	   (2 (%gl:uniform-2f location (vec-ref vec 0) (vec-ref vec 1)))
-	   (3 (%gl:uniform-3f location (vec-ref vec 0) (vec-ref vec 1) (vec-ref vec 2)))
-	   (4 (%gl:uniform-3f location
-			      (vec-ref vec 0) (vec-ref vec 1) (vec-ref vec 2) (vec-ref vec 3))))))
+    (handler-case 
+	(ecase (dimension vec)
+	       (1 (%gl:uniform-1f location (vec-ref vec 0)))
+	       (2 (%gl:uniform-2f location (vec-ref vec 0) (vec-ref vec 1)))
+	       (3 (%gl:uniform-3f location (vec-ref vec 0) (vec-ref vec 1) (vec-ref vec 2)))
+	       (4 (%gl:uniform-4f
+		   location (vec-ref vec 0) (vec-ref vec 1) (vec-ref vec 2) (vec-ref vec 3))))
+      (gl:opengl-error (e)
+        (error (format nil "~aError ~a when binding location ~a of shader ~a with vector ~a"
+		       (unbound-shader-error-text shader) e name shader vec))))))
 
 (defmacro bind-vec (shader name vec)
+  "Bind the vector to the location with name NAME in SHADER. make sure the SHADER is bound before calling this function."
   `(internal-bind-vec ,shader ,name (make-vec-if-list ,vec)))
 
 (declaim (ftype (function (vec vec) number) dot))

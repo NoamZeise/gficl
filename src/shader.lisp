@@ -41,14 +41,20 @@ Must be manually freed by calling DELETE-GL"
 (defmethod bind-gl ((obj shader))
   (gl:use-program (id obj)))
 
-(declaim (ftype (function (shader string) unsigned-byte) shader-loc))
+(declaim (ftype (function (shader string) integer) shader-loc))
 (defun shader-loc (shader name)
   "Get location of the uniform with name in the shader"
   (let ((location (gl:get-uniform-location (id shader) name)))
-    (assert (not (= location -1)) ()
-	    "Shader ~a ~%did not have a variable with name ~a" shader name)
+    (if (= location -1)
+	(warn "Shader ~a ~%did not have a variable with name ~a. (The variable may not have been used)" shader name))
     location))
 
+(defun check-shader-bound (shader)
+  (equalp (id shader) (gl:get-integer :current-program)))
+
+(defun unbound-shader-error-text (shader)
+  (if (check-shader-bound shader) ""
+    (format nil "Passed shader is not bound. Call (BIND-GL shader) before setting shader uniform values.~%~%")))
 
 ;;; ------- Helpers -------
 
