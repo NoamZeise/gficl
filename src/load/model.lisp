@@ -22,7 +22,7 @@
 				    using (hash-value attribute) do
 				    (let ((view (gltf:buffer-view attribute)))
 				      (format t "~a:~%" key)
-				      (describe view))))))))))
+				      (describe view)))))))
 
 ;;; ---- helpers ----
 

@@ -267,4 +267,4 @@ fov is in radians."
 	  (loop for row in
 		(slot-value matrix 'data)
 		do (push (coerce (nth (- i 1) row) 'single-float) floats)))
-    (cffi:foreign-alloc :float :initial-contents (nreverse floats)))))
+    (cffi:foreign-alloc :float :initial-contents (nreverse floats))))
