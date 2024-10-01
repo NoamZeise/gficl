@@ -29,4 +29,5 @@
   :components ((:module "src/load"
 		:components
 		((:file "package")
-		 (:file "model")))))
+		 (:file "model")
+		 (:file "shader")))))
