@@ -24,10 +24,14 @@
 
 (defsystem :gficl/load
   :depends-on (:gficl
+	       ;; model
 	       :cl-wavefront
-	       :cl-gltf)
+	       :cl-gltf
+	       ;; image
+	       :pngload)
   :components ((:module "src/load"
 		:components
 		((:file "package")
 		 (:file "model")
-		 (:file "shader")))))
+		 (:file "shader")
+		 (:file "image")))))
