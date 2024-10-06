@@ -190,7 +190,7 @@ returns as values the view matrix, the left vector, and the up vector."
   (assert (not (or (equal top bottom)
 		   (equal left right)
 		   (equal near far)))
-	  () "ortho matrix must have top!=bottom left!=right near!=nar")
+	  () "ortho matrix must have top!=bottom left!=right near!=far")
   (make-matrix-from-data
    `((,(/ 2 (- right left)) 0 0 ,(- (/ (+ right left) (- right left))))
      (0 ,(/ 2 (- top bottom)) 0 ,(- (/ (+ top bottom) (- top bottom))))
