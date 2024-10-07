@@ -18,6 +18,7 @@
    #:map-keys-pressed
    
    ;; gl objects
+   #:gl-object
    #:id
    #:bind-gl
    #:delete-gl
