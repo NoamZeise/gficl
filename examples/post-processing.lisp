@@ -155,15 +155,14 @@ void main() {
   (if (> *samples* 1)
       (setf *resolve-fb*
 	    (gficl:make-framebuffer
-	     (list (gficl:make-attachment-description :color-attachment0 :type :texture))
+	     (list (gficl:make-attachment-description :type :texture))
 	     w h)))
   (if *offscreen-fb* (gficl:delete-gl *offscreen-fb*))
   (setf *offscreen-fb* nil)
   (setf *offscreen-fb*
 	(gficl:make-framebuffer
-	 (list (gficl:make-attachment-description :color-attachment0
-						  :type (if *resolve-fb* :renderbuffer :texture))
-	       (gficl:make-attachment-description :depth-stencil-attachment))
+	 (list (gficl:make-attachment-description :type (if *resolve-fb* :renderbuffer :texture))
+	       (gficl:make-attachment-description :position :depth-stencil-attachment))
 	 w h :samples *samples*))
   (gficl:bind-gl *main-shader*)
   (gficl:bind-matrix *main-shader* "projection"

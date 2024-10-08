@@ -39,9 +39,12 @@
    #:make-texture-with-fn
    #:get-image-format
 
+   ;; framebuffer attachment description
+   #:attachment-description
+   #:make-attachment-description
+   #:attach-desc-type
    ;; framebuffer
    #:framebuffer
-   #:make-attachment-description
    #:make-framebuffer
    #:blit-framebuffers
    #:framebuffer-texture-id

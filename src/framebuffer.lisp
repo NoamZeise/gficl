@@ -35,26 +35,16 @@ returns NIL otherwise."
 
 (deftype attachment-type () '(member :texture :renderbuffer))
 
-(defclass attachment-description ()
-  ((pos :initarg :pos :accessor attachment-position :type attachment-position)
-   (type :initarg :type :accessor attachment-type :type attachment-type)
-   (texture-wrap :initarg :wrap :accessor attachment-wrap :type texture-wrap)
-   (internal-format :initarg :internal-format :accessor internal-format)))
-
-(declaim (ftype (function (attachment-position &key
-					       (:type attachment-type)
-					       (:wrap texture-wrap)
-					       (:internal-format t))
-			  (values attachment-description &optional))
-		make-attachment-description))
-(defun make-attachment-description (position &key (type :renderbuffer)
-					     (wrap :clamp-to-edge)
-					     (internal-format nil))
-  "Defines the properties of a FRAMEBUFFER attachment.
+(defstruct (attachment-description (:conc-name attach-desc-))
+	   "Defines the properties of a FRAMEBUFFER attachment.
 A list of ATTACHMENT-DESCRIPTION is passed to MAKE-FRAMEBUFFER.
 
-ATTACHMENT-POSITION is what kind of drawing the attachment will be used for.
-Either one of the colour attachments, depth, stencil, or depth-stencil.
+ATTACHMENT-POSITION is the type of rendering the attachment will be used for.
+It must be one of:
+- :color-attachmentN (where N is a positive integer)
+- :depth-attachment
+- :stencil-attachment
+- :depth-stencil-attachment
 
 :type can be a :renderbuffer or a :texture
 - :renderbuffer for attachments you do not need to sample from
@@ -65,17 +55,16 @@ Either one of the colour attachments, depth, stencil, or depth-stencil.
 it is sampled outside of it's range.
 
 :interal-format is the internal texture format used by the texture or renderbuffer"
-  (make-instance 'attachment-description
-		 :pos position
-		 :type type
-		 :wrap wrap
-		 :internal-format internal-format))
+	   (position :color-attachment0 :type attachment-position)
+	   (type :renderbuffer :type attachment-type)
+	   (wrap :clamp-to-edge :type texture-wrap)
+	   (internal-format nil))
 
 (defmethod print-object ((obj attachment-description) out)
   (print-unreadable-object
    (obj out :type t)
    (format out "~a ~a"
-	   (attachment-position obj) (attachment-type obj))))
+	   (attach-desc-position obj) (attach-desc-type obj))))
 
 ;; --- framebuffer ---
 
@@ -96,7 +85,9 @@ Must be manually freed with DELETE-GL.
 
 The index of a framebuffer attachment is equal to it's position in the ATTACHMENT-DESCRIPTIONS list.
 
-:draw-buffers is a list of DRAW-BUFFER items. If :draw-buffers is not supplied, draw buffers will be all of the passed colour attachments."
+:draw-buffers is a list of DRAW-BUFFER items. 
+If :draw-buffers is not supplied, draw buffers will be all of the passed colour attachments.
+"
   (let ((id (gl:gen-framebuffer))
 	(draw-buffer-list draw-buffers)
 	(internal-attachments
@@ -185,15 +176,16 @@ Pass 0 or nil as READ-FB or DRAW-FB to use the backbuffer as the blit source or 
   "Create attachment resource. Either a texture or a renderbuffer.
 A suitable image format will be selected based on attachment position."
   (assert (and (> width 0) (> height 0) (> samples 0)))
-  (let* ((pos (attachment-position desc))
-	 (resource-type (attachment-type desc))
+  (let* ((pos (attach-desc-position desc))
+	 (resource-type (attach-desc-type desc))
 	 (colour-attachment (color-attachment-p pos))
 	 (attachment-type (if colour-attachment :color pos))
 	 (format (ecase attachment-type
 			(:color :rgb)			
 			(:depth-attachment :depth-component)
 			((:depth-stencil-attachment :stencil-attachment) :depth-stencil)))
-	 (internal-format (if (internal-format desc) (internal-format desc) format))
+	 (internal-format (if (attach-desc-internal-format desc)
+			      (attach-desc-internal-format desc) format))
 	 (data-type (ecase attachment-type
 			   (:color :unsigned-byte)
 			   (:depth-stencil-attachment :unsigned-int-24-8)
@@ -210,7 +202,7 @@ A suitable image format will be selected based on attachment position."
 				    :format format
 				    :internal-format internal-format
 				    :samples samples
-				    :wrap (attachment-wrap desc)
+				    :wrap (attach-desc-wrap desc)
 				    :data-type data-type
 				    :filter filter
 				    :mipmapping nil))

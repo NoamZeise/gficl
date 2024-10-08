@@ -3,8 +3,8 @@
 (defparameter *samples* 1)
 
 (defparameter *fb-attachments*
-  (list (gficl:make-attachment-description :color-attachment0)
-	(gficl:make-attachment-description :depth-stencil-attachment)))
+  (list (gficl:make-attachment-description)
+	(gficl:make-attachment-description :position :depth-stencil-attachment)))
 (defparameter *fb* nil)
 
 ;; shader

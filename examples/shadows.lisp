@@ -388,8 +388,8 @@ void main() {
 		     (gficl:screen-perspective-matrix w h (* pi 0.4) 0.1))
   (if *fb* (gficl:delete-gl *fb*))
   (setf *fb* (gficl:make-framebuffer
-	      (list (gficl:make-attachment-description :color-attachment0)
-		    (gficl:make-attachment-description :depth-stencil-attachment))
+	      (list (gficl:make-attachment-description :position :color-attachment0)
+		    (gficl:make-attachment-description :position :depth-stencil-attachment))
 	      w h :samples (min +max-samples+ (gl:get-integer :max-samples)))))
 
 (defun cleanup ()
@@ -537,7 +537,8 @@ void main() {
 (defmethod initialize-instance :after ((instance basic-shadow) &key &allow-other-keys)
 	   (let ((fb (with-slots (map-size) instance
 		       (gficl:make-framebuffer
-			(list (gficl:make-attachment-description :depth-attachment :type :texture))
+			(list (gficl:make-attachment-description
+			       :position :depth-attachment :type :texture))
 			map-size map-size)))
 		 (shader (gficl:make-shader *shadow-vert* *shadow-frag*)))
 	     (gl:bind-texture :texture-2d (gficl:framebuffer-texture-id fb 0))
@@ -592,16 +593,15 @@ Percentage-Close filtering - Sample the shadow map at multiple points to find th
 		 ((ms-fb
 		   (gficl:make-framebuffer
 		    (list (gficl:make-attachment-description
-			   :color-attachment0
+			   :position :color-attachment0
 			   :internal-format :rgba32f)
-			  (gficl:make-attachment-description
-			   :depth-attachment))
+			  (gficl:make-attachment-description :position :depth-attachment))
 		    map-size map-size
 		    :samples samples))
 		  (resolve-fb
 		   (gficl:make-framebuffer
 		    (list (gficl:make-attachment-description
-			   :color-attachment0
+			   :position :color-attachment0
 			   :internal-format :rgba32f
 			   :type :texture))
 		    map-size map-size))
