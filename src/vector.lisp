@@ -44,9 +44,24 @@
   "Bind the vector to the location with name NAME in SHADER. make sure the SHADER is bound before calling this function."
   `(internal-bind-vec ,shader ,name (make-vec-if-list ,vec)))
 
+(defun internal-=vec (v1 v2 &rest vecs)
+  (loop initially (if (not (= (dimension v1) (dimension v2))) (return nil))
+	for x across (slot-value v1 'data)
+	for y across (slot-value v2 'data)
+	when (not (= x y)) do (return nil) finally (return t)))
+
+(defmacro =vec (v1 v2 &rest vecs)
+  "Check if a series of VEC objects have equal dimension and values."
+  `(loop for (a b) on
+	 (nconc (list (make-vec-if-list ,v1)
+		      (make-vec-if-list ,v2))
+		(list ,@(loop for v in vecs collecting `(make-vec-if-list ,v))))
+	 when (not (eql b nil)) when (not (internal-=vec a b)) do (return nil)
+	 finally (return t)))
+
 (declaim (ftype (function (vec vec) number) dot))
 (defun dot (v1 v2)
-  "dot product of two VECs, extra dimensions are ignored"
+  "dot product of two VECs, extra dimensions are ignored."
   (loop for x across (slot-value v1 'data)
 	for y across (slot-value v2 'data) summing
 	(* x y)))

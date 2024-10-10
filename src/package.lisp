@@ -61,6 +61,7 @@
    #:bind-vec
    #:make-vec
    #:vec-ref
+   #:=vec
    #:dot
    #:+vec
    #:-vec
