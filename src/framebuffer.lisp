@@ -66,6 +66,19 @@ it is sampled outside of it's range.
    (format out "~a ~a"
 	   (attach-desc-position obj) (attach-desc-type obj))))
 
+(declaim (ftype (function (attachment-description) t) attach-desc-clear-bit))
+(defun attach-desc-clear-bits (attach-desc)
+  "Return a list of clear bits that would completely clear the attachment."
+  (with-slots (position) attach-desc
+    (cond ((color-attachment-p position)
+	   (list :color-buffer-bit))
+	  ((eql position :depth-attachment)
+	   (list :depth-buffer-bit))
+	  ((eql position :stencil-attachment)
+	   (list :stencil-buffer-bit))
+	  ((eql position :depth-stencil-attachment)
+	   (list :depth-buffer-bit :stencil-buffer-bit)))))
+
 ;; --- framebuffer ---
 
 (deftype draw-buffer ()
