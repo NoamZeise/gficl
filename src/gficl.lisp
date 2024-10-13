@@ -62,6 +62,7 @@ PRE-WINDOW-FN is called after glfw is initialised but before a window is created
      (setf *state*
 	   (make-instance 'render-state :width ,width :height ,height :resize-fn ,resize-callback))
      (setf *active-objects* 0)
+     (setf *shader-warnings* nil)
      ;; keys found in glfw:create-window
      (glfw:with-init
       (funcall ,pre-window-fn)
