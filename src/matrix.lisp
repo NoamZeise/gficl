@@ -213,7 +213,7 @@ returns as values the view matrix, the left vector, and the up vector."
    `((,(/ (* 2 near) (- right left)) 0 ,(- (/ (+ right left) (- right left))) 0)
      (0 ,(/ (* 2 near) (- top bottom)) ,(- (/ (+ top bottom) (- top bottom))) 0)
      ,(if far
-	  `(0 0 ,(- (/ (+ far near) (- far near))) ,(- (/ (* 2 far near) (- far near))))
+	  `(0 0 ,(- (/ (+ near far) (- near far))) ,(/ (* 2 near far) (- near far)))
 	`(0 0 1 ,(- (* 2 near))))
      (0 0 1 0))))
 
