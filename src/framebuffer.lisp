@@ -13,25 +13,26 @@ returns NIL otherwise."
 		(error () "-1")))
 	   (error () -1)))
 	(max-attachments
-	 (cffi:with-foreign-object (p :int)
-				   ;; opengl does not change the supplied pointer to
-				   ;; gl:get-xxx functions if it hasn't been loaded yet
-				   ;; so we use some sane default for type checking
-				   ;; that happens before ogl is loaded
-				   (setf (cffi:mem-aref p :int) 16)
-				   (handler-case (%gl:get-integer-v :max-color-attachments p)
-				     (error ()))
-				   (cffi:mem-aref p :int))))
+	 (cffi:with-foreign-object
+	  (p :int)
+	  ;; opengl does not change the supplied pointer to
+	  ;; gl:get-xxx functions if it hasn't been loaded yet
+	  ;; so we use some sane default for type checking
+	  ;; that happens before ogl is loaded
+	  (setf (cffi:mem-aref p :int) 16)
+	  (handler-case (%gl:get-integer-v :max-color-attachments p)
+	    (error ()))
+	  (cffi:mem-aref p :int))))
     (and (>= n 0)
 	 (<= n max-attachments))))
 
 (deftype attachment-position ()
-	 '(or
-	   (member
-	    :depth-stencil-attachment
-	    :depth-attachment
-	    :stencil-attachment)
-	   (satisfies color-attachment-p)))
+  '(or
+    (member
+     :depth-stencil-attachment
+     :depth-attachment
+     :stencil-attachment)
+    (satisfies color-attachment-p)))
 
 (deftype attachment-type () '(member :texture :renderbuffer))
 
@@ -55,10 +56,10 @@ It must be one of:
 it is sampled outside of it's range.
 
 :interal-format is the internal texture format used by the texture or renderbuffer"
-	   (position :color-attachment0 :type attachment-position)
-	   (type :renderbuffer :type attachment-type)
-	   (wrap :clamp-to-edge :type texture-wrap)
-	   (internal-format nil))
+  (position :color-attachment0 :type attachment-position)
+  (type :renderbuffer :type attachment-type)
+  (wrap :clamp-to-edge :type texture-wrap)
+  (internal-format nil))
 
 (defmethod print-object ((obj attachment-description) out)
   (print-unreadable-object
@@ -82,8 +83,8 @@ it is sampled outside of it's range.
 ;; --- framebuffer ---
 
 (deftype draw-buffer ()
-	 '(or (member :none :front-left :front-right :back-left :back-right)
-	      (satisfies color-attachment-p)))
+  '(or (member :none :front-left :front-right :back-left :back-right)
+       (satisfies color-attachment-p)))
 
 (defclass framebuffer (gl-object)
   ((attachments :initarg :attachments :accessor attachments)))
@@ -144,6 +145,18 @@ Will signal an error if the index is out of range, or if the attachment at that 
 	(id (resource (car attach)))
       (error "Tried to get the attachment id of a non texture attachment"))))
 
+(declaim (ftype (function (framebuffer framebuffer attachment-position))
+		framebuffer-add-external-attachment))
+(defun framebuffer-add-external-attachment (target-fb src-fb pos)
+  "use the attachment at position POS from source framebuffer and attach it 
+to position POS in target framebufer"
+  (let ((a (framebuffer-get-attachment src-fb pos))
+	(target-a (framebuffer-get-attachment target-fb pos)))
+    (if (not a) (error "source framebuffer did not have an attachment at position ~a" pos))
+    (if target-a (error "target framebuffer already has an attachment at position ~a" pos))
+    (bind-gl target-fb)
+    (attach-to-framebuffer a)))
+
 (declaim (ftype (function (t t integer integer &key
 			     (:buffer-list list) (:filter texture-filter)))
 		blit-framebuffers))	
@@ -174,6 +187,15 @@ Pass 0 or nil as READ-FB or DRAW-FB to use the backbuffer as the blit source or 
    (obj out :type t)
    (format out "~{~%  ~a~}"
 	   (attachments obj))))
+
+;; -- framebuffer helpers --
+
+(declaim (ftype (function (framebuffer attachment-position)) framebuffer-get-attachment))
+(defun framebuffer-get-attachment (fb pos)
+  "return attachment at position POS"
+  (loop for attachment in (attachments fb)
+	when (eql pos (attachment-position attachment))
+	return attachment finally 'nil))
 
 ;; --- internal attachment ---
 

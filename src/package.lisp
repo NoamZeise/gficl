@@ -50,6 +50,7 @@
    #:make-framebuffer
    #:blit-framebuffers
    #:framebuffer-texture-id
+   #:framebuffer-add-external-attachment
 
    ;; shader
    #:shader
