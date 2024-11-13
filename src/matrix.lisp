@@ -210,7 +210,7 @@ returns as values the view matrix, the left vector, and the up vector."
 (defun perspective-matrix (top bottom left right near &optional far)
   "create a 4x4 perspective projection MATRIX, far plane at infinity if not given."
   (make-matrix-from-data
-   `((,(/ (* 2 near) (- right left)) 0 ,(- (/ (+ right left) (- right left))) 0)
+   `((,(/ (* 2 near) (- left right)) 0 ,(- (/ (+ left right) (- left right))) 0)
      (0 ,(/ (* 2 near) (- top bottom)) ,(- (/ (+ top bottom) (- top bottom))) 0)
      ,(if far
 	  `(0 0 ,(- (/ (+ near far) (- near far))) ,(/ (* 2 near far) (- near far)))

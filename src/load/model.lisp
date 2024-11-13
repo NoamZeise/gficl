@@ -25,7 +25,7 @@
 					    (path :metallic (obj:metallic-map mat))
 					    (path :normal (obj:normal-map mat))))))
 				 textures))))
-    (values meshes textures)))
+    (values meshes (reverse textures))))
 
 (defun path (key val)
   "return pairlis cons, where val is an obj texture map"

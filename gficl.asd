@@ -27,8 +27,9 @@
 	       ;; model
 	       :cl-wavefront
 	       :cl-gltf
-	       ;; image
-	       :pngload)
+	       ;; images
+	       :pngload
+	       :cl-jpeg)
   :components ((:module "src/load"
 		:components
 		((:file "package")
