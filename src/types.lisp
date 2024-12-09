@@ -2,7 +2,7 @@
 
 (deftype cursor-state () '(member :normal :hidden :disabled))
 
-(deftype shader-type () '(member :vertex-shader :fragment-shader))
+(deftype shader-type () '(member :vertex-shader :fragment-shader :compute-shader))
 
 (deftype buffer-mask () '(member :color-buffer-bit :depth-buffer-bit :stencil-buffer-bit))
 
