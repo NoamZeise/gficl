@@ -11,6 +11,27 @@ Must be manually freed by calling DELETE-GL"
 	(fragment-code (uiop:read-file-string fragment-path)))
     (make-shader vertex-code fragment-code)))
 
+(defmacro create-shader-program (compiled-shaders link-error-args)
+  "Create a shader using the glsl source code supplied
+for the vertex and fragment shader.
+Must be manually freed by calling DELETE-GL"
+  (let ((program (gensym)) (log (gensym)))
+      `(let ((,program (gl:create-program)))
+	 ;; link shader
+	 ,@(loop for shader in compiled-shaders collecting
+		 `(gl:attach-shader ,program ,shader))
+	 (gl:link-program ,program)
+	 (let ((,log (gl:get-program-info-log ,program)))
+	   (if (not (eql (length ,log) 0))
+	       (error 'shader-link-error :link-log ,log
+		      ,@link-error-args)))
+	 ,@(loop for shader in compiled-shaders nconcing
+		 (list
+		  `(gl:detach-shader ,program ,shader)
+		  `(gl:delete-shader ,shader)))
+	 (create-gl)
+	 (make-instance 'shader :id ,program))))
+
 (declaim (ftype (function (string string) shader) make-shader))
 (defun make-shader (vertex-code fragment-code)
   "Create a shader using the glsl source code supplied
@@ -68,27 +89,6 @@ Must be manually freed by calling DELETE-GL"
       (if (not (eql (length compile-log) 0))
 	  (error 'shader-compile-error :compile-log compile-log :source source-code)))
     shader))
-
-(defmacro create-shader-program (compiled-shaders link-error-args)
-  "Create a shader using the glsl source code supplied
-for the vertex and fragment shader.
-Must be manually freed by calling DELETE-GL"
-  (let ((program (gensym)) (log (gensym)))
-      `(let ((,program (gl:create-program)))
-	 ;; link shader
-	 ,@(loop for shader in compiled-shaders collecting
-		 `(gl:attach-shader ,program ,shader))
-	 (gl:link-program ,program)
-	 (let ((,log (gl:get-program-info-log ,program)))
-	   (if (not (eql (length ,log) 0))
-	       (error 'shader-link-error :link-log ,log
-		      ,@link-error-args)))
-	 ,@(loop for shader in compiled-shaders nconcing
-		 (list
-		  `(gl:detach-shader ,program ,shader)
-		  `(gl:delete-shader ,shader)))
-	 (create-gl)
-	 (make-instance 'shader :id ,program))))
 
 (define-condition shader-compile-error (error)
   ((compile-log :initarg :compile-log :reader compile-log)
