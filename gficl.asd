@@ -20,7 +20,8 @@
 		 (:file "shader" :depends-on ("types"))
 		 (:file "framebuffer" :depends-on ("types" "image"))
 		 (:file "image" :depends-on ("types"))
-		 (:file "vertex" :depends-on ("types"))))))
+		 (:file "vertex" :depends-on ("types"))
+		 (:file "buffer" :depends-on ("types"))))))
 
 (defsystem :gficl/load
   :depends-on (:gficl

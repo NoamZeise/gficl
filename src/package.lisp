@@ -43,6 +43,13 @@
    #:make-texture-with-fn
    #:get-image-format
 
+   ;; buffer
+   #:storage-buffer
+   #:make-storage-buffer
+   #:make-empty-storage-buffer
+   #:make-storage-buffer-from-array
+   #:bind-storage-buffer
+
    ;; framebuffer attachment description
    #:attachment-description
    #:make-attachment-description
