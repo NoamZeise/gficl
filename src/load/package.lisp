@@ -5,4 +5,5 @@
   (:export
    :model
    :image
-   :shader))
+   :shader
+   :compute-shader))

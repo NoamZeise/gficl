@@ -46,3 +46,15 @@
   (case action
 	(:press (setf (gethash key (slot-value state 'key-state)) t))
 	(:release (remhash key (slot-value state 'key-state)))))
+
+;; --- hardware state ---
+
+(defparameter *max-msaa-samples* 0)
+
+(declaim (ftype (function (&optional integer) integer) msaa-samples))
+(defun msaa-samples (&optional (samples 0))
+  "Return the minimum of SAMPLES and maximum supported samples.
+Returns maximum supported samples if SAMPLES is 0, or samples isn't passed"
+  (if (= *max-msaa-samples* 0)
+      (setf *max-msaa-samples* (gl:get-integer :max-samples)))
+  (if (> samples 0) (min samples *max-msaa-samples*) *max-msaa-samples*))

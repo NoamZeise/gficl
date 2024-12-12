@@ -16,6 +16,9 @@
    #:key-pressed
    #:map-keys-down
    #:map-keys-pressed
+
+   ;;hardware querying
+   #:msaa-samples
    
    ;; gl objects
    #:gl-object
@@ -55,6 +58,7 @@
    ;; shader
    #:shader
    #:make-shader
+   #:make-compute-shader
    #:make-shader-from-path
    #:shader-loc
 
