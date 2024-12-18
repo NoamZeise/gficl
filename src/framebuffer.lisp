@@ -87,7 +87,8 @@ it is sampled outside of it's range.
        (satisfies color-attachment-p)))
 
 (defclass framebuffer (gl-object)
-  ((attachments :initarg :attachments :accessor attachments)))
+  ((attachments :initarg :attachments :accessor attachments)
+   (draw-buffers :initarg :draw-buffers)))
 
 (declaim (ftype (function (list integer integer &key (:samples integer) (:draw-buffers list))
 			  (values framebuffer &optional))
@@ -122,7 +123,8 @@ If :draw-buffers is not supplied, draw buffers will be all of the passed colour 
       (unless (gl::enum= status :framebuffer-complete)
 	(error "Failed to create framebuffer, gl error: ~a" status)))
     (create-gl)
-    (make-instance 'framebuffer :attachments internal-attachments :id id)))
+    (make-instance 'framebuffer
+     :attachments internal-attachments :id id :draw-buffers draw-buffer-list)))
 
 (defmethod delete-gl ((obj framebuffer))
   (loop for a in (attachments obj) do (delete-gl a))
@@ -158,12 +160,31 @@ to position POS in target framebufer"
     (attach-to-framebuffer a)))
 
 (declaim (ftype (function (t t integer integer &key
-			     (:buffer-list list) (:filter texture-filter)))
+			     (:buffer-list list)
+			     (:filter texture-filter)
+			     (:read-attachments list)
+			     (:draw-attachments list)))
 		blit-framebuffers))	
 (defun blit-framebuffers (read-fb draw-fb width height &key	
-				  (buffer-list (list :color-buffer-bit)) (filter :nearest))
-  "blit framebuffers with same width and height, such as for resolving a multisample framebuffer.
-Pass 0 or nil as READ-FB or DRAW-FB to use the backbuffer as the blit source or destination respectively."
+				  (buffer-list (list :color-buffer-bit))
+				  (filter :nearest)
+				  read-attachments
+				  draw-attachments)
+  "Blit framebuffers with same width and height, such as for resolving a multisample framebuffer.
+
+Pass 0 or nil as READ-FB or DRAW-FB to use the backbuffer as the blit source or destination respectively.
+
+BUFFER-LIST specifies which buffers to blit (ie colour/depth/stencil). 
+By default only colour is blitted.
+
+FILTER gives the texture filtering method used when blitting. :nearest by default.
+
+READ-ATTACHMENTS and DRAW-ATTACHMENTS specify which attachments to blit from one framebuffer to the other. If nothing is passed it will try to blit all shared color buffers.
+Eg. if READ-FB have two colour attachments, 
+-> passing nothing will blit :color-attachment0 and :color-attachment1 from READ-FB to DRAW-FB
+-> passing `:draw-attachmenmts '(:color-attachment1 :color-attachment0)` will blit 
+         attachment0 from READ-FB onto attachment1 from DRAW-FB, and 
+         attachment1 from READ-FB onto attachment0 from DRAW-FB"
   (loop for b in buffer-list do
 	(assert (typep b 'buffer-mask) ()
 		"element ~a of buffer list is not a valid buffer mask: ~a"
@@ -178,9 +199,19 @@ Pass 0 or nil as READ-FB or DRAW-FB to use the backbuffer as the blit source or 
 		       (id draw-fb)))))
     (gl:bind-framebuffer :draw-framebuffer draw)
     (gl:bind-framebuffer :read-framebuffer read)
-    (%gl:blit-framebuffer 0 0 width height
-			  0 0 width height
-			  buffer-list filter)))
+    (loop for read-b in (if read-attachments read-attachments
+			  (if read-fb (slot-value read-fb 'draw-buffers) '(:front)))
+	  for draw-b in (if draw-attachments draw-attachments
+			  (if draw-fb (slot-value draw-fb 'draw-buffers) '(:front)))
+	  for i from 0 when (or (= i 0) (find :color-buffer-bit buffer-list)) do
+	  (progn
+	    (if read-b (gl:read-buffer read-b))
+	    (if draw-b (gl:draw-buffer draw-b))	    
+	    (%gl:blit-framebuffer 0 0 width height
+				  0 0 width height
+				  ;; only need to blit depth/stencil buffers once
+				  (if (= i 0) buffer-list '(:color-buffer-bit))
+				  filter)))))
 
 (defmethod print-object ((obj framebuffer) out)
   (print-unreadable-object

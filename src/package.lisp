@@ -54,6 +54,7 @@
    #:attachment-description
    #:make-attachment-description
    #:attach-desc-type
+   #:attach-desc-position
    #:attach-desc-clear-bits
    ;; framebuffer
    #:framebuffer
