@@ -46,7 +46,6 @@
    ;; buffer
    #:storage-buffer
    #:make-storage-buffer
-   #:make-empty-storage-buffer
    #:make-storage-buffer-from-array
    #:bind-storage-buffer
 

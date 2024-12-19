@@ -21,30 +21,24 @@
 (defmethod bind-gl ((obj storage-buffer))
   (gl:bind-buffer :shader-storage-buffer (id obj)))
 
-(declaim (ftype (function (integer cffi:foreign-pointer buffer-usage)
+(declaim (ftype (function (buffer-usage integer
+				   &key (:data cffi:foreign-pointer))
 			  (values storage-buffer &optional))
 		make-storage-buffer))
-(defun make-storage-buffer (size data usage)
+(defun make-storage-buffer (usage size &key (data (cffi:null-pointer)))
   (let ((id (gl:gen-buffer)))
     (gl:bind-buffer :shader-storage-buffer id)
     (%gl:buffer-data :shader-storage-buffer size data usage)
     (create-gl)
     (make-instance 'storage-buffer :id id :buffer-size size)))
 
-(declaim (ftype (function (integer buffer-usage)
-			  (values storage-buffer &optional))
-		make-empty-storage-buffer))
-(defun make-empty-storage-buffer (size usage)
-  "create an uninitialized shader storage buffer of SIZE bytes"
-  (make-storage-buffer size (cffi:null-pointer) usage))
-
-(declaim (ftype (function (integer t buffer-usage array)
+(declaim (ftype (function (buffer-usage t integer array)
 			  (values storage-buffer &optional))
 		make-storage-buffer-from-array))
-(defun make-storage-buffer-from-array (size type usage lisp-array)
+(defun make-storage-buffer-from-array (usage type size lisp-array)
   (cffi:with-foreign-array
    (data lisp-array `(:array ,type ,size))
-   (make-storage-buffer (* size (cffi:foreign-type-size type)) data usage)))
+   (make-storage-buffer usage (* size (cffi:foreign-type-size type)) :data data)))
 
 (declaim (ftype (function (storage-buffer integer &key (:offset integer) (:size integer)))
 		bind-storage-buffer))
