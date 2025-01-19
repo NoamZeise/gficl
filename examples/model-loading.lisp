@@ -94,7 +94,7 @@ void main() {
   (setf *target* (gficl:make-vec '(0 0 0)))
   (update-view 0)
   (gl:enable :cull-face :depth-test :multisample)
-  (gl:cull-face :front))
+  (gl:cull-face :back))
 
 (defun resize (w h)
   (gficl:bind-gl *main-shader*)

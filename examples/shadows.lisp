@@ -322,7 +322,7 @@ void main() {
   (setup-shaders)
   (resize (gficl:window-width) (gficl:window-height))
   (gl:enable :cull-face)
-  (gl:cull-face :front))
+  (gl:cull-face :back))
 
 (defun setup-globals ()
   (setf *fb* nil)

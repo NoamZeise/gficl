@@ -189,11 +189,13 @@ Eg. if READ-FB have two colour attachments,
 	(assert (typep b 'buffer-mask) ()
 		"element ~a of buffer list is not a valid buffer mask: ~a"
 		b '(:colour-buffer-bit :depth-buffer-bit :stencil-buffer-bit)))
-  (let ((read (if (or (equalp read-fb 0) (not read-fb)) 0
+  (let ((read (if (or (equalp read-fb 0) (not read-fb))
+		  (progn (setf read-fb nil) 0)
 		(progn (assert (typep read-fb 'framebuffer) ()
 			       "read-fb must be a framebuffer (or nil)")
 		       (id read-fb))))
-	(draw (if (or (equalp draw-fb 0) (not draw-fb)) 0
+	(draw (if (or (equalp draw-fb 0) (not draw-fb))
+		  (progn (setf draw-fb nil) 0)
 		(progn (assert (typep draw-fb 'framebuffer) ()
 			       "draw-fb must be a framebuffer (or nil)")
 		       (id draw-fb)))))
