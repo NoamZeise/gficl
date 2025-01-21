@@ -12,10 +12,11 @@
   "returns the current window height"
   (win-height *state*))
 
-(defun toggle-fullscreen ()
+(defun toggle-fullscreen (&optional (windowed-borderless nil))
   "Changes the window from windowed to fullscreen or fullscreen to windowed
-depending on it's current state."
-  (set-fullscreen (not (fullscreen *state*))))
+depending on it's current state.
+If windowed-borderless is true then the fullscreen mode will be windowed without borders"
+  (set-fullscreen (not (fullscreen *state*)) windowed-borderless))
 
 (defmacro with-update ((&optional frame-time-var) &body body)
   "Polls input and window events. 
@@ -78,8 +79,8 @@ PRE-WINDOW-FN is called after glfw is initialised but before a window is created
 	   (format t "~%Warning: ~a gl object~:p ~:*~[ ~;was~:;were~] not freed~%"
 		   *active-objects*))))))
 
-(declaim (ftype (function (boolean)) set-fullscreen))
-(defun set-fullscreen (bool)
+(declaim (ftype (function (boolean boolean)) set-fullscreen))
+(defun set-fullscreen (bool windowed-borderless)
   (if (not (fullscreen *state*))
       (progn (setf (prev-width *state*) (window-width))
 	     (setf (prev-height *state*) (window-height))
@@ -96,8 +97,10 @@ PRE-WINDOW-FN is called after glfw is initialised but before a window is created
 	 (height (if bool (getf mode '%glfw::height)
 		   (prev-height *state*)))
 	 (refresh (if bool (getf mode '%glfw::refresh-rate) 0)))
-    (%glfw:set-window-monitor glfw:*window*
-			      monitor x y width height refresh)
+    (%glfw:set-window-monitor
+     glfw:*window*
+     (if windowed-borderless (cffi:null-pointer) monitor)
+     x y width height refresh)
     (setf (fullscreen *state*) bool)))
 
 ;;; ------------- GLFW CALLBACKS -----------------
