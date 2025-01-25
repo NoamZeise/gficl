@@ -74,6 +74,15 @@
    (loop for row in (slot-value matrix 'data) collecting
 	 (loop for e in row collecting (* scalar e)))))
 
+(declaim (ftype (function (matrix vec) vec) mat*vec))
+(defun mat*vec (matrix vec)
+  (assert (equalp (dimension matrix) (dimension vec)) ()
+	  "matrix and vec have different dimensions: ~a ~a" matrix vec)
+  (make-vec
+   (loop for row in (slot-value matrix 'data) collecting
+	 (loop for e in row for v across (slot-value vec 'data)
+	       summing (* v e)))))
+
 (declaim (ftype (function (matrix) matrix) transpose-matrix cofactor-matrix inverse-matrix))
 
 (defun transpose-matrix (matrix)

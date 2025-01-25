@@ -108,12 +108,22 @@ PRE-WINDOW-FN is called after glfw is initialised but before a window is created
 (defun register-glfw-callbacks ()
   ;; set opengl pointer to lib loaded by glfw
   (setf %gl:*gl-get-proc-address* #'glfw:get-proc-address) 
-  (glfw:set-key-callback 'quit-with-esc)
+  (glfw:set-key-callback 'update-keys)
+  (glfw:set-cursor-position-callback 'update-cursor-pos)
+  (glfw:set-mouse-button-callback 'update-mouse-button-cb)
   (glfw:set-window-size-callback 'resize-callback))
 
-(glfw:def-key-callback quit-with-esc (window key scancode action mod-keys)
+(glfw:def-key-callback update-keys (window key scancode action mod-keys)
   (declare (ignore window scancode mod-keys))
   (update-key-state (render-input *state*) key action))
+
+(glfw:def-cursor-pos-callback update-cursor-pos (window x y)
+  (declare (ignore window))
+  (update-mouse-pos (render-input *state*) x y))
+
+(glfw:def-mouse-button-callback update-mouse-button-cb (window button action mod-keys)
+  (declare (ignore window mod-keys))
+  (update-mouse-buttons (render-input *state*) button action))
 
 (glfw:def-window-size-callback resize-callback (window w h)
   (declare (ignore window))

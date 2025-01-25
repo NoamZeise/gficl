@@ -17,6 +17,10 @@
     (loop for elem in data do (assert (numberp elem) () "~a is not a number." elem))
     (make-instance 'vec :data (make-array length :initial-contents data) :dimension length)))
 
+(declaim (ftype (function (vec) list) vec-data))
+(defun vec-data (vec)
+  (loop for x across (slot-value vec 'data) collecting x))
+
 (defmacro vec-ref (vec pos)
   `(assert (and (integerp ,pos) (> pos 0) (< pos (dimension ,vec))) ()
 	   "vec pos was out of range.")

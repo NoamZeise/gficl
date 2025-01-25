@@ -11,11 +11,18 @@
    #:toggle-fullscreen
    #:set-fullscreen
 
-   ;; input
+   ;;; Input
+   ;; keyboard
    #:key-down
    #:key-pressed
    #:map-keys-down
    #:map-keys-pressed
+   ;; mouse
+   #:mouse-pos
+   #:button-down
+   #:button-pressed
+   #:map-buttons-down
+   #:map-buttons-pressed
 
    ;;hardware querying
    #:msaa-samples
@@ -73,6 +80,7 @@
    #:vec
    #:bind-vec
    #:make-vec
+   #:vec-data
    #:vec-ref
    #:=vec
    #:dot
@@ -102,6 +110,7 @@
    #:*mat
    #:+mat
    #:scalar*mat
+   #:mat*vec
    #:transpose-matrix
    #:cofactor-matrix
    #:determinant
