@@ -23,7 +23,7 @@ If windowed-borderless is true then the fullscreen mode will be windowed without
 frame-time-var gives the seconds since last update"
   (if frame-time-var
       `(let ((,frame-time-var (update-frame-time))) (update-render-state) (glfw:poll-events) ,@body)
-    `(progn (glfw:poll-events) ,@body (update-render-state))))
+    `(progn (update-render-state) (glfw:poll-events) ,@body)))
 
 (defmacro with-render (&body body)
   "enclose gl render calls, swaps the backbuffer at end."

@@ -78,9 +78,18 @@
 (declaim (ftype (function (vec &rest vec) (values vec &optional)) internal-+vec))
 (defun internal-+vec (vec &rest vecs)
   (if (not (car vecs)) vec
-    (apply #'internal-+vec (make-vec (loop for x across (slot-value vec 'data)
-					   for y across (slot-value (car vecs) 'data) collecting
-					   (+ x y)))
+    (apply #'internal-+vec
+	   (let ((v1 (slot-value vec 'data))
+		 (v2 (slot-value (car vecs) 'data)))
+	     (let* ((l1 (length v1))
+		    (l2 (length v2))
+		    (l (max l1 l2)))
+	       (cond ((not (= l1 l2))
+		      (setf v1 (adjust-array v1 l :initial-element 0))
+		      (setf v2 (adjust-array v2 l :initial-element 0)))))
+	     (make-vec (loop for x across v1
+			     for y across v2
+			     collecting (+ x y))))
 	   (cdr vecs))))
 
 (defmacro +vec (vec &rest vecs)
