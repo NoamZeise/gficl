@@ -243,21 +243,24 @@ fov is in radians."
     (gficl:scale-matrix
      (list (if (< ratio 1) ratio 1) (if (> ratio 1) (/ 1 ratio) 1) 1))))
 
-(declaim (ftype (function (number number number number
-				  &key (:depth number) (:rotation number) (:pivot gficl:vec)))
+(declaim (ftype (function (vec
+			   &key (:depth number) (:rotation number) (:pivot vec)))
 		2d-rect-matrix))
-(defun 2d-rect-matrix (x y w h &key (depth 0) (rotation 0) (pivot (gficl:make-vec '(0 0))))
-  (gficl:*mat
-   (gficl:translation-matrix (list x y depth))
-   (let ((px (gficl:vec-ref pivot 0))
-	 (py (gficl:vec-ref pivot 1)))
-     (if (not (= rotation 0))
-	 (gficl:*mat
-	  (gficl:translation-matrix (list px py 0))
-	  (gficl:2d-rotation-matrix rotation)
-	  (gficl:translation-matrix (list (- px) (- py) 0)))
-       (gficl:make-matrix)))
-   (gficl:scale-matrix (list w h 1))))
+(defun 2d-rect-matrix (rect &key (depth 0) (rotation 0) (pivot (gficl:make-vec '(0 0))))
+  (assert (= (dimension rect) 4) ()
+	  "~% rect vec must have 4 components: (x y w h)" rect)
+  (destructuring-bind (x y w h) (vec-data rect)
+    (gficl:*mat
+     (gficl:translation-matrix (list x y depth))
+     (let ((px (gficl:vec-ref pivot 0))
+	   (py (gficl:vec-ref pivot 1)))
+       (if (not (= rotation 0))
+	   (gficl:*mat
+	    (gficl:translation-matrix (list px py 0))
+	    (gficl:2d-rotation-matrix rotation)
+	    (gficl:translation-matrix (list (- px) (- py) 0)))
+	 (gficl:make-matrix)))
+     (gficl:scale-matrix (list w h 1)))))
 
 ;;; --- set shader matrices ---
 
