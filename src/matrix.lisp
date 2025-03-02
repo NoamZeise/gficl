@@ -214,7 +214,7 @@ returns as values the view matrix, the left vector, and the up vector."
 	  "ortho width and height must be positive: ~ax~a" width height)
   (orthographic-matrix 0 height 0 width near far))
 
-(declaim (ftype (function (number number number number number &optional number) matrix)
+(declaim (ftype (function (number number number number number &optional t) matrix)
 		perspective-matrix))
 (defun perspective-matrix (top bottom left right near &optional far)
   "create a 4x4 perspective projection MATRIX, far plane at infinity if not given."
